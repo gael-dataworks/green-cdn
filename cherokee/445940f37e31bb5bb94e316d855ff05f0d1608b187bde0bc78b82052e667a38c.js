@@ -2,268 +2,243 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  const matPurple = new THREE.MeshStandardMaterial({ color: 0xdcd0ff, roughness: 0.8, metalness: 0.0 });
-  const matMint = new THREE.MeshStandardMaterial({ color: 0xc4f0d6, roughness: 0.8, metalness: 0.0 });
-  const matPeach = new THREE.MeshStandardMaterial({ color: 0xffe4c4, roughness: 0.8, metalness: 0.0 });
-  const matRoof = new THREE.MeshStandardMaterial({ color: 0xe89b9b, roughness: 0.6, metalness: 0.1 });
-  const matWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0.0 });
-  const matDoor = new THREE.MeshStandardMaterial({ color: 0xa8d8ea, roughness: 0.7, metalness: 0.0 });
-  const matGlass = new THREE.MeshStandardMaterial({ color: 0xa0a0a0, roughness: 0.2, metalness: 0.1 });
-  const matBase = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, roughness: 0.9, metalness: 0.0 });
-  const matGutter = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.3 });
+  const purpleMat = new THREE.MeshStandardMaterial({ color: 0xE0D4F0, roughness: 0.7, metalness: 0.0 });
+  const greenMat = new THREE.MeshStandardMaterial({ color: 0xD4F0E0, roughness: 0.7, metalness: 0.0 });
+  const yellowMat = new THREE.MeshStandardMaterial({ color: 0xF0E8D4, roughness: 0.7, metalness: 0.0 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0xE8A0A0, roughness: 0.6, metalness: 0.0 });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5, metalness: 0.0 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0xA0E0F0, roughness: 0.6, metalness: 0.0 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x405060, roughness: 0.2, metalness: 0.1 });
+  const stepMat = new THREE.MeshStandardMaterial({ color: 0xCCCCCC, roughness: 0.8, metalness: 0.0 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xD0B090, roughness: 0.8, metalness: 0.0 });
+  const gutterMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.3 });
+  const knobMat = new THREE.MeshStandardMaterial({ color: 0xDDDDDD, roughness: 0.3, metalness: 0.5 });
 
   // --- Dimensions ---
-  const houseW = 1.2;
-  const houseD = 0.9;
-  const wallH = 0.6;
-  const roofH = 0.35;
+  const houseW = 1.0;
+  const houseD = 0.7;
+  const wallH = 0.5;
+  const roofH = 0.3;
   const wallThick = 0.04;
-  
-  // Segment widths (Front face)
-  const segLeftW = 0.35;
-  const segCenterW = 0.35;
-  const segRightW = 0.35; // Includes corner wrap effectively
-  
-  // --- Base ---
-  const baseGeom = new THREE.BoxGeometry(houseW + 0.04, 0.05, houseD + 0.04);
-  const base = new THREE.Mesh(baseGeom, matBase);
-  base.position.y = -0.025;
+  const roofOverhang = 0.08;
+
+  // --- Base / Foundation ---
+  const baseGeom = new THREE.BoxGeometry(houseW + 0.02, 0.03, houseD + 0.02);
+  const base = new THREE.Mesh(baseGeom, baseMat);
+  base.position.y = -wallH / 2 - 0.015;
   root.add(base);
 
   // --- Walls ---
-  // We construct the walls as separate boxes to handle color segmentation cleanly.
+  // We construct walls as thick boxes that overlap slightly to avoid gaps.
   
-  // Left Wall (Purple) - Front
-  const wallLeft = new THREE.Mesh(
-    new THREE.BoxGeometry(segLeftW, wallH, wallThick),
-    matPurple
-  );
-  wallLeft.position.set(-houseW/2 + segLeftW/2, wallH/2, houseD/2);
-  root.add(wallLeft);
+  // Side Wall (Yellow) - Right side
+  const wallSideGeom = new THREE.BoxGeometry(wallThick, wallH, houseD);
+  const wallSide = new THREE.Mesh(wallSideGeom, yellowMat);
+  wallSide.position.set(houseW / 2, 0, 0);
+  root.add(wallSide);
 
-  // Center Wall (Mint) - Front
-  const wallCenter = new THREE.Mesh(
-    new THREE.BoxGeometry(segCenterW, wallH, wallThick),
-    matMint
-  );
-  wallCenter.position.set(-segRightW/2 + segCenterW/2, wallH/2, houseD/2); // Centered roughly
-  // Recalculate X: Left ends at -0.25. Center starts -0.25, ends 0.10.
-  wallCenter.position.set(-0.075, wallH/2, houseD/2);
-  root.add(wallCenter);
-
-  // Right Wall Block (Peach) - This wraps the corner
-  // Front part
-  const wallRightFront = new THREE.Mesh(
-    new THREE.BoxGeometry(segRightW, wallH, wallThick),
-    matPeach
-  );
-  wallRightFront.position.set(houseW/2 - segRightW/2, wallH/2, houseD/2);
-  root.add(wallRightFront);
-
-  // Side part (Right side of house)
-  const wallRightSide = new THREE.Mesh(
-    new THREE.BoxGeometry(wallThick, wallH, houseD),
-    matPeach
-  );
-  wallRightSide.position.set(houseW/2, wallH/2, 0);
-  root.add(wallRightSide);
-
-  // Back Wall (Peach) - Closing the volume
-  const wallBack = new THREE.Mesh(
-    new THREE.BoxGeometry(houseW, wallH, wallThick),
-    matPeach
-  );
-  wallBack.position.set(0, wallH/2, -houseD/2);
+  // Back Wall (Yellow)
+  const wallBackGeom = new THREE.BoxGeometry(houseW, wallH, wallThick);
+  const wallBack = new THREE.Mesh(wallBackGeom, yellowMat);
+  wallBack.position.set(0, 0, -houseD / 2);
   root.add(wallBack);
 
-  // --- Gables (Triangles) ---
-  // Using CylinderGeometry with 3 radial segments to make a prism, rotated to lie flat
-  const gableGeom = new THREE.CylinderGeometry(houseW/2 + 0.1, houseW/2 + 0.1, roofH, 3, 1);
-  // Rotate so flat face is front/back. Default cylinder is Y-up. 
-  // We want the triangle to face Z. So rotate X by 90 deg.
-  // But Cylinder 3-seg orientation depends on rotation. 
-  // Easier: Extrude a triangle shape.
-  
-  const gableShape = new THREE.Shape();
-  gableShape.moveTo(-houseW/2 - 0.1, 0);
-  gableShape.lineTo(houseW/2 + 0.1, 0);
-  gableShape.lineTo(0, roofH);
-  gableShape.lineTo(-houseW/2 - 0.1, 0);
-  
-  const gableExtrudeSettings = { depth: wallThick, bevelEnabled: false };
-  const gableGeomFront = new THREE.ExtrudeGeometry(gableShape, gableExtrudeSettings);
-  const gableFront = new THREE.Mesh(gableGeomFront, matPeach);
-  gableFront.position.set(0, wallH, houseD/2);
-  root.add(gableFront);
+  // Front Left Wall (Purple)
+  const wallFrontLeftGeom = new THREE.BoxGeometry(houseW / 2, wallH, wallThick);
+  const wallFrontLeft = new THREE.Mesh(wallFrontLeftGeom, purpleMat);
+  wallFrontLeft.position.set(-houseW / 4, 0, houseD / 2);
+  root.add(wallFrontLeft);
 
-  const gableBack = new THREE.Mesh(gableGeomFront, matPeach);
-  gableBack.position.set(0, wallH, -houseD/2);
-  gableBack.rotation.y = Math.PI;
-  root.add(gableBack);
+  // Front Right Wall (Green)
+  const wallFrontRightGeom = new THREE.BoxGeometry(houseW / 2, wallH, wallThick);
+  const wallFrontRight = new THREE.Mesh(wallFrontRightGeom, greenMat);
+  wallFrontRight.position.set(houseW / 4, 0, houseD / 2);
+  root.add(wallFrontRight);
 
-  // --- Roof Planks ---
-  // Create ridges on the roof
-  const plankW = 0.06;
-  const plankThick = 0.015;
-  const roofSlopeLen = Math.sqrt(Math.pow(houseW/2 + 0.1, 2) + Math.pow(roofH, 2));
-  const plankCount = 14;
+  // --- Roof ---
+  // Triangular prism using CylinderGeometry with 3 radial segments
+  const roofRadius = (houseW / 2 + roofOverhang) / Math.cos(Math.atan2(roofH, houseW / 2));
+  const roofLength = houseD + roofOverhang * 2;
+  const roofGeom = new THREE.CylinderGeometry(0, roofRadius, roofLength, 3, 1);
+  // Rotate to align triangle base with XZ plane, apex up Y
+  roofGeom.rotateZ(-Math.PI / 2); 
+  // The cylinder creates a prism pointing along Z. We need it along X? 
+  // Default Cylinder is Y-up. 3 segments = triangle in XZ plane if rotated?
+  // Let's use Extrude for precise control or rotate Cylinder carefully.
+  // Cylinder(3 segments) creates a triangle in the XY plane (if looking from top).
+  // We want the triangle in the YZ plane (gable face) or XY plane?
+  // Gable is on the front/back (XY plane). So the prism runs along Z.
+  // Default Cylinder: Axis Y. 3 segments -> Triangle in XZ plane.
+  // We want Triangle in XY plane (facing Z). So rotate X by 90 deg.
+  roofGeom.rotateX(Math.PI / 2);
   
-  const plankGeom = new THREE.BoxGeometry(houseD + 0.2, plankThick, plankW);
-  
-  for (let i = 0; i < plankCount; i++) {
-    // Distribute planks along the slope
-    // We need to place them on both sides of the ridge
-    const t = (i / (plankCount - 1)) * 2 - 1; // -1 to 1
-    const xPos = t * (houseW/2 + 0.1);
-    const yPos = wallH + roofH * (1 - Math.abs(t)); // Linear interpolation for height
-    
-    // Actually, let's just stack them up the slope properly
-    // Slope angle
-    const slopeAngle = Math.atan2(roofH, houseW/2 + 0.1);
-    const distFromRidge = (i - plankCount/2) * plankW;
-    
-    const x = distFromRidge * Math.cos(slopeAngle);
-    const y = wallH + roofH - Math.abs(distFromRidge) * Math.sin(slopeAngle);
-    
-    // Wait, simpler: Just place boxes rotated to match slope
-    // Left side planks
-    if (i < plankCount/2) {
-       const plank = new THREE.Mesh(plankGeom, matRoof);
-       const offset = (i + 0.5) * plankW;
-       plank.position.set(-offset/2, wallH + offset * Math.tan(slopeAngle), 0);
-       plank.rotation.z = -slopeAngle;
-       plank.rotation.y = Math.PI/2; // Align with roof ridge (X axis) -> No, ridge is X, planks run Z?
-       // Reference: Planks run Front-to-Back (Z axis). Ridge is X axis.
-       // So plank long axis is Z.
-       plank.rotation.z = -slopeAngle; 
-       plank.position.set(- (houseW/2 + 0.1)/2 + offset * Math.cos(slopeAngle), wallH + offset * Math.sin(slopeAngle), 0);
-       // This is getting complicated. Let's just make two big planes with a texture or simple geometry.
-       // Simpler: Two large boxes for the roof planes.
-    }
-  }
-  
-  // Simpler Roof: Two large rotated boxes
-  const roofPlaneGeom = new THREE.BoxGeometry(houseD + 0.2, 0.02, houseW/2 + 0.15);
-  const roofLeft = new THREE.Mesh(roofPlaneGeom, matRoof);
-  roofLeft.position.set(-(houseW/2 + 0.1)/2, wallH + roofH/2, 0);
-  roofLeft.rotation.z = Math.atan2(roofH, houseW/2 + 0.1);
+  const roof = new THREE.Mesh(roofGeom, roofMat);
+  roof.position.set(0, wallH / 2 + roofH / 2, 0);
+  // Scale to fit width
+  // The radius determines the distance from center to vertex.
+  // We need the base width to be houseW + 2*overhang.
+  // For an equilateral triangle, height = width * sqrt(3)/2.
+  // Our triangle is isosceles.
+  // Let's just scale the mesh.
+  const roofScaleX = (houseW + roofOverhang * 2) / (roofRadius * Math.sqrt(3)); // Approx
+  // Actually simpler: Create a custom shape or just scale the cylinder.
+  // Let's rely on scaling the geometry.
+  roof.scale.set((houseW + roofOverhang * 2) / (roofRadius * 1.732), 1, roofLength / roofRadius);
+  // Re-evaluating Roof Geometry for precision:
+  // Use a Box for the core and two slanted boxes for the slopes? No, Cylinder is standard.
+  // Let's use a simpler approach: Two slanted boxes.
+  root.remove(roof);
+
+  const slopeW = Math.sqrt(Math.pow(houseW / 2 + roofOverhang, 2) + Math.pow(roofH, 2));
+  const slopeGeom = new THREE.BoxGeometry(slopeW, wallThick, roofLength);
+  const roofLeft = new THREE.Mesh(slopeGeom, roofMat);
+  roofLeft.position.set(-houseW / 4, wallH + roofH / 2, 0);
+  roofLeft.rotation.z = -Math.atan2(roofH, houseW / 2 + roofOverhang);
   root.add(roofLeft);
 
-  const roofRight = new THREE.Mesh(roofPlaneGeom, matRoof);
-  roofRight.position.set((houseW/2 + 0.1)/2, wallH + roofH/2, 0);
-  roofRight.rotation.z = -Math.atan2(roofH, houseW/2 + 0.1);
+  const roofRight = new THREE.Mesh(slopeGeom, roofMat);
+  roofRight.position.set(houseW / 4, wallH + roofH / 2, 0);
+  roofRight.rotation.z = Math.atan2(roofH, houseW / 2 + roofOverhang);
   root.add(roofRight);
 
-  // Add ridges to roof (thin boxes on top)
-  const ridgeGeom = new THREE.BoxGeometry(houseD + 0.2, 0.01, 0.04);
-  for(let i=0; i<10; i++) {
-     const ridge = new THREE.Mesh(ridgeGeom, matRoof);
-     // Place on left slope
-     const zPos = -houseD/2 + i * (houseD/8);
-     ridge.position.set(-(houseW/2 + 0.1)/2, wallH + roofH, zPos);
-     ridge.rotation.z = Math.atan2(roofH, houseW/2 + 0.1);
-     root.add(ridge);
-     
-     // Place on right slope
-     const ridgeR = new THREE.Mesh(ridgeGeom, matRoof);
-     ridgeR.position.set((houseW/2 + 0.1)/2, wallH + roofH, zPos);
-     ridgeR.rotation.z = -Math.atan2(roofH, houseW/2 + 0.1);
-     root.add(ridgeR);
-  }
-  
-  // Roof Trim (White fascia)
-  const fasciaGeom = new THREE.BoxGeometry(houseD + 0.2, 0.03, 0.05);
-  const fasciaLeft = new THREE.Mesh(fasciaGeom, matWhite);
-  fasciaLeft.position.set(-(houseW/2 + 0.1), wallH + 0.05, 0);
-  root.add(fasciaLeft);
-  const fasciaRight = new THREE.Mesh(fasciaGeom, matWhite);
-  fasciaRight.position.set((houseW/2 + 0.1), wallH + 0.05, 0);
-  root.add(fasciaRight);
+  // Roof Ridges (Corrugation)
+  const ridgeGeom = new THREE.BoxGeometry(slopeW, 0.005, 0.02);
+  const ridgeCount = 12;
+  for (let i = 0; i < ridgeCount; i++) {
+    const z = -roofLength / 2 + (roofLength / ridgeCount) * (i + 0.5);
+    const ridgeL = new THREE.Mesh(ridgeGeom, roofMat);
+    ridgeL.position.copy(roofLeft.position);
+    ridgeL.position.z = z;
+    ridgeL.rotation.z = roofLeft.rotation.z;
+    root.add(ridgeL);
 
-  // --- Windows ---
-  function createWindow(w, h, matFrame, matGlass) {
+    const ridgeR = new THREE.Mesh(ridgeGeom, roofMat);
+    ridgeR.position.copy(roofRight.position);
+    ridgeR.position.z = z;
+    ridgeR.rotation.z = roofRight.rotation.z;
+    root.add(ridgeR);
+  }
+
+  // Roof Trim (Fascia)
+  const trimGeom = new THREE.BoxGeometry(houseW + roofOverhang * 2, 0.02, 0.02);
+  const trimFront = new THREE.Mesh(trimGeom, whiteMat);
+  trimFront.position.set(0, wallH, houseD / 2 + roofOverhang / 2);
+  root.add(trimFront);
+  
+  const trimBack = new THREE.Mesh(trimGeom, whiteMat);
+  trimBack.position.set(0, wallH, -houseD / 2 - roofOverhang / 2);
+  root.add(trimBack);
+
+  // --- Windows Helper ---
+  function createWindow() {
     const group = new THREE.Group();
-    // Frame
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), matFrame);
+    const frameGeom = new THREE.BoxGeometry(0.12, 0.14, 0.02);
+    const frame = new THREE.Mesh(frameGeom, whiteMat);
     group.add(frame);
-    // Glass
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.8, h * 0.8), matGlass);
-    glass.position.z = 0.011;
+
+    const glassGeom = new THREE.BoxGeometry(0.08, 0.10, 0.01);
+    const glass = new THREE.Mesh(glassGeom, glassMat);
+    glass.position.z = 0.005;
     group.add(glass);
-    // Muntins (Cross)
-    const muntinV = new THREE.Mesh(new THREE.BoxGeometry(0.02, h, 0.02), matFrame);
-    group.add(muntinV);
-    const muntinH = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, 0.02), matFrame);
-    group.add(muntinH);
+
+    // Muntins (Cross bars)
+    const barVGeom = new THREE.BoxGeometry(0.01, 0.10, 0.015);
+    const barV = new THREE.Mesh(barVGeom, whiteMat);
+    barV.position.z = 0.006;
+    group.add(barV);
+
+    const barHGeom = new THREE.BoxGeometry(0.08, 0.01, 0.015);
+    const barH = new THREE.Mesh(barHGeom, whiteMat);
+    barH.position.z = 0.006;
+    group.add(barH);
+
     return group;
   }
 
-  // Window 1 (Purple Wall)
-  const win1 = createWindow(0.15, 0.2, matWhite, matGlass);
-  win1.position.set(-houseW/2 + segLeftW/2, wallH/2 + 0.1, houseD/2 + 0.02);
-  root.add(win1);
+  // Place Windows
+  // Front Left (Purple)
+  const winFL = createWindow();
+  winFL.position.set(-houseW / 4, 0.05, houseD / 2 + 0.02);
+  root.add(winFL);
 
-  // Window 2 (Mint Wall)
-  const win2 = createWindow(0.15, 0.2, matWhite, matGlass);
-  win2.position.set(-0.075, wallH/2 + 0.1, houseD/2 + 0.02);
-  root.add(win2);
+  // Front Right (Green)
+  const winFR = createWindow();
+  winFR.position.set(houseW / 4, 0.05, houseD / 2 + 0.02);
+  root.add(winFR);
 
-  // Window 3 & 4 (Peach Side Wall)
-  const win3 = createWindow(0.15, 0.2, matWhite, matGlass);
-  win3.position.set(houseW/2 + 0.02, wallH/2 + 0.1, -0.2);
-  win3.rotation.y = -Math.PI/2;
-  root.add(win3);
+  // Side (Yellow) - Two windows
+  const winS1 = createWindow();
+  winS1.rotation.y = -Math.PI / 2;
+  winS1.position.set(houseW / 2 + 0.02, 0.05, -houseD / 4);
+  root.add(winS1);
 
-  const win4 = createWindow(0.15, 0.2, matWhite, matGlass);
-  win4.position.set(houseW/2 + 0.02, wallH/2 + 0.1, 0.2);
-  win4.rotation.y = -Math.PI/2;
-  root.add(win4);
+  const winS2 = createWindow();
+  winS2.rotation.y = -Math.PI / 2;
+  winS2.position.set(houseW / 2 + 0.02, 0.05, houseD / 4);
+  root.add(winS2);
+
+  // Gable Vent (Small square in the triangle)
+  const ventGroup = new THREE.Group();
+  const ventFrameGeom = new THREE.BoxGeometry(0.06, 0.06, 0.02);
+  const ventFrame = new THREE.Mesh(ventFrameGeom, whiteMat);
+  ventGroup.add(ventFrame);
+  const ventGlassGeom = new THREE.BoxGeometry(0.04, 0.04, 0.01);
+  const ventGlass = new THREE.Mesh(ventGlassGeom, glassMat);
+  ventGlass.position.z = 0.005;
+  ventGroup.add(ventGlass);
+  // Slats
+  for(let i=0; i<3; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.015), whiteMat);
+    slat.position.set(0, -0.01 + i*0.01, 0.006);
+    ventGroup.add(slat);
+  }
+  ventGroup.position.set(-houseW / 4, wallH + 0.15, houseD / 2 + 0.02);
+  root.add(ventGroup);
 
   // --- Door ---
-  const doorW = 0.18;
-  const doorH = 0.35;
-  const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.02), matDoor);
-  door.position.set(-0.075, doorH/2, houseD/2 + 0.02);
+  const doorGeom = new THREE.BoxGeometry(0.14, 0.22, 0.02);
+  const door = new THREE.Mesh(doorGeom, doorMat);
+  door.position.set(houseW / 4, -0.14, houseD / 2 + 0.02);
   root.add(door);
-  
-  // Door Knob
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), matWhite);
-  knob.position.set(-0.075 + doorW/2 - 0.03, doorH/2, houseD/2 + 0.03);
-  root.add(knob);
 
-  // Door Frame
-  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.04, doorH + 0.04, 0.03), matWhite);
-  doorFrame.position.set(-0.075, doorH/2, houseD/2 + 0.01);
+  const doorFrameGeom = new THREE.BoxGeometry(0.16, 0.24, 0.02);
+  const doorFrame = new THREE.Mesh(doorFrameGeom, whiteMat);
+  doorFrame.position.set(houseW / 4, -0.14, houseD / 2 + 0.01);
   root.add(doorFrame);
 
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), knobMat);
+  knob.position.set(houseW / 4 + 0.05, -0.14, houseD / 2 + 0.03);
+  root.add(knob);
+
   // Step
-  const step = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.15), matBase);
-  step.position.set(-0.075, -0.025, houseD/2 + 0.1);
+  const stepGeom = new THREE.BoxGeometry(0.20, 0.04, 0.12);
+  const step = new THREE.Mesh(stepGeom, stepMat);
+  step.position.set(houseW / 4, -wallH / 2 - 0.02, houseD / 2 + 0.10);
   root.add(step);
 
-  // --- Vent ---
-  const vent = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.02), matWhite);
-  vent.position.set(0, wallH + roofH/2, houseD/2 + 0.01);
-  root.add(vent);
-  // Vent slats
-  for(let i=0; i<4; i++) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.01, 0.01), matGlass);
-    slat.position.set(0, wallH + roofH/2 - 0.03 + i*0.02, houseD/2 + 0.015);
-    root.add(slat);
-  }
+  // --- Gutter & Downspout ---
+  // Along the right roof edge
+  const gutterPipeGeom = new THREE.CylinderGeometry(0.01, 0.01, roofLength, 8);
+  gutterPipeGeom.rotateX(Math.PI / 2);
+  const gutterPipe = new THREE.Mesh(gutterPipeGeom, gutterMat);
+  gutterPipe.position.set(houseW / 2 + roofOverhang / 2, wallH + roofH / 2, 0);
+  // Rotate to match roof slope
+  gutterPipe.rotation.z = Math.atan2(roofH, houseW / 2 + roofOverhang);
+  root.add(gutterPipe);
 
-  // --- Gutter ---
-  const gutterGeom = new THREE.CylinderGeometry(0.02, 0.02, houseD, 8, 1, true, 0, Math.PI);
-  const gutter = new THREE.Mesh(gutterGeom, matGutter);
-  gutter.rotation.z = Math.PI/2;
-  gutter.rotation.y = Math.PI/2;
-  gutter.position.set(houseW/2 + 0.05, wallH, 0);
-  root.add(gutter);
-  
-  // Downspout
-  const downspout = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, wallH, 8), matGutter);
-  downspout.position.set(houseW/2 + 0.05, wallH/2, -houseD/2);
+  // Downspout at back corner
+  const downspoutGeom = new THREE.CylinderGeometry(0.01, 0.01, wallH + roofH, 8);
+  const downspout = new THREE.Mesh(downspoutGeom, gutterMat);
+  downspout.position.set(houseW / 2 + roofOverhang / 2, 0, -houseD / 2 - roofOverhang / 2);
   root.add(downspout);
+
+  // Elbow
+  const elbowGeom = new THREE.TorusGeometry(0.01, 0.005, 8, 16, Math.PI / 2);
+  const elbow = new THREE.Mesh(elbowGeom, gutterMat);
+  elbow.rotation.y = Math.PI / 2;
+  elbow.rotation.z = Math.PI / 2;
+  elbow.position.set(houseW / 2 + roofOverhang / 2, wallH + roofH, -houseD / 2 - roofOverhang / 2);
+  root.add(elbow);
 
   fitToUnitCube(THREE, root);
   return root;

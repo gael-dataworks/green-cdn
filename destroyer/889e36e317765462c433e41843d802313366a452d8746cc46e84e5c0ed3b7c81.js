@@ -2,158 +2,145 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Steel blade: Polished metal. Cap metalness at 0.6 per rules.
+  // Steel Blade: Bright, polished metal. Using emissive to combat dim renderer.
   const bladeMat = new THREE.MeshStandardMaterial({
     color: 0xd4d4d4,
     metalness: 0.6,
     roughness: 0.2,
+    emissive: 0xd4d4d4,
+    emissiveIntensity: 0.35,
   });
 
-  // Brass bolster/pommel: Yellowish metal.
+  // Brass/Gold Bolster & End Cap
   const brassMat = new THREE.MeshStandardMaterial({
     color: 0xd4af37,
     metalness: 0.6,
     roughness: 0.3,
+    emissive: 0xd4af37,
+    emissiveIntensity: 0.3,
   });
 
-  // Handle: Matte black plastic/composite.
+  // Handle: Matte black composite/wood
   const handleMat = new THREE.MeshStandardMaterial({
     color: 0x1a1a1a,
     metalness: 0.0,
-    roughness: 0.6,
+    roughness: 0.5,
   });
 
-  // --- Logo Texture (Procedural DataTexture) ---
-  // Simulate the "HAI" logo mark on the blade.
-  // Since we can't use Canvas API, we draw a dark rectangular patch to represent the logo area.
+  // --- Procedural Logo Texture ---
+  // Creates a simple data texture for the blade marking
   const texWidth = 256;
   const texHeight = 64;
-  const texData = new Uint8Array(texWidth * texHeight * 4);
-  
+  const data = new Uint8Array(texWidth * texHeight * 4);
   for (let i = 0; i < texWidth * texHeight; i++) {
-    // Base: transparent/silver (white with alpha 0 for modulation, or light gray)
-    // We want the logo to be dark. Let's make the background white (no change to metal color)
-    // and the logo area dark gray.
-    // Actually, for MeshStandardMaterial map, white = full color, black = no color.
-    // So background should be white (255), logo should be dark (50).
-    
-    const x = i % texWidth;
-    const y = Math.floor(i / texWidth);
-    
-    // Define logo area: centered horizontally, middle vertically
-    const inLogoX = x > 80 && x < 180;
-    const inLogoY = y > 20 && y < 45;
-    
-    let val = 220; // Light silver background
-    if (inLogoX && inLogoY) {
-      // Draw a simple blocky shape for the logo
-      // A dark rectangle
-      val = 40; 
-      
-      // Add some internal detail to look like text "HAI" roughly
-      // Vertical bars
-      if ((x > 90 && x < 100) || (x > 130 && x < 140) || (x > 170 && x < 180)) {
-         val = 30;
-      }
-      // Horizontal bar for A
-      if (y > 30 && y < 34 && x > 130 && x < 140) {
-         val = 30;
+    // Base light steel color
+    data[i * 4] = 220;
+    data[i * 4 + 1] = 220;
+    data[i * 4 + 2] = 220;
+    data[i * 4 + 3] = 255;
+  }
+  // Draw a dark rectangular "text" area in the center
+  const startX = Math.floor(texWidth * 0.3);
+  const endX = Math.floor(texWidth * 0.7);
+  const startY = Math.floor(texHeight * 0.2);
+  const endY = Math.floor(texHeight * 0.8);
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      const idx = (y * texWidth + x) * 4;
+      // Dark gray text
+      data[idx] = 40;
+      data[idx + 1] = 40;
+      data[idx + 2] = 40;
+      // Add some "noise" or lines to simulate text characters
+      if ((x + y) % 4 === 0) {
+        data[idx] = 20;
+        data[idx + 1] = 20;
+        data[idx + 2] = 20;
       }
     }
-    
-    const idx = i * 4;
-    texData[idx] = val;
-    texData[idx + 1] = val;
-    texData[idx + 2] = val;
-    texData[idx + 3] = 255;
   }
-
-  const logoTexture = new THREE.DataTexture(texData, texWidth, texHeight, THREE.RGBAFormat);
+  const logoTexture = new THREE.DataTexture(data, texWidth, texHeight, THREE.RGBAFormat);
   logoTexture.colorSpace = THREE.SRGBColorSpace;
   logoTexture.needsUpdate = true;
+  // Flip Y because UVs often start bottom-left
+  logoTexture.flipY = true;
   bladeMat.map = logoTexture;
 
-  // --- Geometry & Meshes ---
-
-  // 1. Blade
-  // Shape for extrusion (side profile in XY plane, extruded along Z)
+  // --- Geometry: Blade ---
+  // Modeled in XY plane (standing up), will be rotated later.
+  // Tip at Y=0.45, Handle junction at Y=-0.1
   const bladeShape = new THREE.Shape();
-  // Heel bottom
-  bladeShape.moveTo(0, -0.01);
-  // Tip bottom (edge)
-  bladeShape.lineTo(0.55, -0.01);
-  // Tip top
-  bladeShape.lineTo(0.55, 0.01);
-  // Spine curve (approximated with lines for simplicity or bezier)
-  bladeShape.quadraticCurveTo(0.3, 0.12, 0.0, 0.06);
-  // Heel top
-  bladeShape.lineTo(0, 0.06);
-  bladeShape.lineTo(0, -0.01);
+  // Start at tip
+  bladeShape.moveTo(0, 0.45);
+  // Spine (top edge) - slight curve down
+  bladeShape.quadraticCurveTo(-0.02, 0.2, -0.05, 0.0);
+  // Heel (back of blade)
+  bladeShape.lineTo(-0.05, -0.1);
+  // Bottom edge (tang/insertion point)
+  bladeShape.lineTo(-0.02, -0.1);
+  // Cutting Edge (belly) - curve back to tip
+  bladeShape.quadraticCurveTo(0.02, 0.1, 0, 0.45);
 
-  const bladeExtrudeSettings = {
-    depth: 0.004, // Thin blade
+  const bladeGeom = new THREE.ExtrudeGeometry(bladeShape, {
+    depth: 0.004,
     bevelEnabled: true,
-    bevelThickness: 0.002,
+    bevelThickness: 0.003,
     bevelSize: 0.002,
     bevelSegments: 2,
     steps: 1,
-  };
-
-  const bladeGeom = new THREE.ExtrudeGeometry(bladeShape, bladeExtrudeSettings);
-  // Center the geometry so pivot is at the heel/bolster junction
-  bladeGeom.translate(-0.002, -0.025, 0); 
+  });
+  // Center the geometry so pivot is reasonable
+  bladeGeom.computeBoundingBox();
+  const bladeCenter = new THREE.Vector3();
+  bladeGeom.boundingBox.getCenter(bladeCenter);
+  bladeGeom.translate(-bladeCenter.x, -bladeCenter.y, -bladeCenter.z);
 
   const blade = new THREE.Mesh(bladeGeom, bladeMat);
-  // Rotate to face +Z. Extrude is along Z by default in Three.js? 
-  // ExtrudeGeometry extrudes along Z. Shape is in XY.
-  // So the flat face is in XY. We want the flat face to be in XZ (horizontal) or YZ (vertical)?
-  // Knife is usually held with blade vertical or horizontal. In the image, it's flat.
-  // Let's make the blade lie in the XZ plane.
-  // Extrude creates geometry in XY, extruded to Z.
-  // We want the profile in XZ, extruded to Y (thickness).
-  // So rotate 90 deg around X.
-  blade.rotation.x = Math.PI / 2;
-  blade.position.z = 0.0; // Start of blade
+  // Position blade so tip is at +Y, handle junction at Y=0
+  // The extrusion center is now 0,0,0. We need to shift it so the "bottom" (handle end) is at Y=0.
+  // Original Y range was -0.1 to 0.45. Height = 0.55. Center was 0.175.
+  // We want bottom at Y=0. So shift up by 0.1.
+  blade.position.y = 0.1;
   root.add(blade);
 
-  // 2. Bolster (Brass collar)
-  // Cylinder between handle and blade
-  const bolsterGeom = new THREE.CylinderGeometry(0.032, 0.035, 0.04, 32);
+  // --- Geometry: Bolster ---
+  // Short brass cylinder between blade and handle
+  const bolsterGeom = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 32);
   const bolster = new THREE.Mesh(bolsterGeom, brassMat);
-  bolster.rotation.x = Math.PI / 2; // Align with Z axis
-  bolster.position.z = -0.02; // Slightly overlapping handle and blade
+  bolster.position.y = -0.02; // Just below blade junction
   root.add(bolster);
 
-  // 3. Handle
-  // Lathe profile for ergonomic shape
-  // Points in XY plane (radius, height). Height runs along Z in local space after rotation.
+  // --- Geometry: Handle ---
+  // Lathe profile in XY plane (X is radius, Y is height going down)
+  // Starts at Y=0 (top of handle), ends at Y=-0.35 (bottom)
   const handlePoints = [];
-  // Start at pommel end (Z = -0.45 relative to bolster)
-  // We build profile from bottom (pommel) to top (bolster)
-  handlePoints.push(new THREE.Vector2(0.028, 0.0)); // Pommel start radius
-  handlePoints.push(new THREE.Vector2(0.028, 0.05)); // Pommel cylinder
-  handlePoints.push(new THREE.Vector2(0.045, 0.15)); // Grip swell
-  handlePoints.push(new THREE.Vector2(0.042, 0.25)); // Mid grip
-  handlePoints.push(new THREE.Vector2(0.035, 0.35)); // Taper to bolster
-  handlePoints.push(new THREE.Vector2(0.032, 0.40)); // Neck
-  handlePoints.push(new THREE.Vector2(0.032, 0.45)); // End at bolster
+  handlePoints.push(new THREE.Vector2(0.04, 0));      // Top neck
+  handlePoints.push(new THREE.Vector2(0.05, -0.12));  // Belly (widest)
+  handlePoints.push(new THREE.Vector2(0.045, -0.25)); // Taper
+  handlePoints.push(new THREE.Vector2(0.035, -0.35)); // End
+  // Close the loop for Lathe (bottom center, top center)
+  handlePoints.push(new THREE.Vector2(0, -0.35));
+  handlePoints.push(new THREE.Vector2(0, 0));
 
   const handleGeom = new THREE.LatheGeometry(handlePoints, 32);
   const handle = new THREE.Mesh(handleGeom, handleMat);
-  // Lathe creates geometry around Y axis. We want it along Z.
-  // Rotate -90 X to put Y axis along Z.
-  handle.rotation.x = -Math.PI / 2;
-  handle.position.z = -0.45; // Position so top of lathe (0.45) meets bolster at 0
+  handle.position.y = -0.02; // Align top with bolster bottom
   root.add(handle);
 
-  // 4. Pommel (Brass end cap)
-  const pommelGeom = new THREE.CylinderGeometry(0.028, 0.028, 0.015, 32);
-  const pommel = new THREE.Mesh(pommelGeom, brassMat);
-  pommel.rotation.x = Math.PI / 2;
-  pommel.position.z = -0.45; // At the very end of the handle
-  root.add(pommel);
+  // --- Geometry: End Cap ---
+  // Brass cap at the bottom of the handle
+  const capGeom = new THREE.CylinderGeometry(0.035, 0.035, 0.025, 32);
+  // Round the bottom slightly by scaling or using a sphere? Cylinder is fine for this style.
+  const endCap = new THREE.Mesh(capGeom, brassMat);
+  endCap.position.y = -0.35 - 0.0125; // Half height below handle end
+  root.add(endCap);
 
-  // --- Normalization ---
+  // --- Orientation ---
+  // Currently the knife is standing up along +Y.
+  // We need it to lie flat on the "table" (XZ plane) and point +Z.
+  // Rotate -90 degrees around X axis.
+  root.rotation.x = -Math.PI / 2;
+
   fitToUnitCube(THREE, root);
   return root;
 }

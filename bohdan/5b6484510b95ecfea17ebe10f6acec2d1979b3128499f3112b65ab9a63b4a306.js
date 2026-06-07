@@ -1,94 +1,92 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
-  // Materials
+  // --- Materials ---
+  // Red painted wood for the keys/bars
   const redWoodMat = new THREE.MeshStandardMaterial({
-    color: 0xd63030,
+    color: 0xc92a2a,
     metalness: 0.0,
     roughness: 0.65,
   });
 
-  const natWoodMat = new THREE.MeshStandardMaterial({
-    color: 0xdcb386,
+  // Natural light wood for the support dowels
+  const naturalWoodMat = new THREE.MeshStandardMaterial({
+    color: 0xd4b483,
     metalness: 0.0,
     roughness: 0.75,
   });
 
-  // --- Dowels (Rails) ---
-  // Two wooden rods running along the X-axis, supporting the keys.
-  const dowelRadius = 0.018;
-  const dowelLength = 0.72;
+  // Dark material for the holes (shadow inside)
+  const holeMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1a1a,
+    metalness: 0.0,
+    roughness: 0.9,
+  });
+
+  // --- Dimensions ---
+  const numBars = 11;
+  const minBarLen = 0.14;
+  const maxBarLen = 0.42;
+  const barWidth = 0.055; // Thickness in X (spacing direction)
+  const barHeight = 0.035; // Thickness in Y
+  const gap = 0.012;
+  const dowelRadius = 0.016;
+  const dowelOverhang = 0.04; // How much dowel sticks out past the outer bars
+
+  // Calculate total width of the instrument
+  const totalBarWidth = numBars * barWidth + (numBars - 1) * gap;
+  const startX = -totalBarWidth / 2;
+
+  // Dowel positions (Z coordinates relative to bar center)
+  // Dowels run along X axis, bars run along Z axis.
+  // Holes are at fixed Z positions on the bars.
+  const dowelZOffset = 0.12; // Distance from center of bar to dowel center
+
+  // --- Dowels ---
+  // Two long cylinders running along the X axis
+  const dowelLength = totalBarWidth + (barWidth) + (dowelOverhang * 2);
   const dowelGeom = new THREE.CylinderGeometry(dowelRadius, dowelRadius, dowelLength, 16);
-  dowelGeom.rotateZ(Math.PI / 2); // Align cylinder (default Y-up) to X-axis
+  dowelGeom.rotateZ(Math.PI / 2); // Rotate to align with X axis
 
-  const dowelOffsetZ = 0.055; // Distance from center line
+  const dowelLeft = new THREE.Mesh(dowelGeom, naturalWoodMat);
+  dowelLeft.position.set(0, -barHeight / 2, -dowelZOffset);
+  root.add(dowelLeft);
 
-  const topDowel = new THREE.Mesh(dowelGeom, natWoodMat);
-  topDowel.position.set(0, 0, dowelOffsetZ);
-  root.add(topDowel);
+  const dowelRight = new THREE.Mesh(dowelGeom, naturalWoodMat);
+  dowelRight.position.set(0, -barHeight / 2, dowelZOffset);
+  root.add(dowelRight);
 
-  const bottomDowel = new THREE.Mesh(dowelGeom, natWoodMat);
-  bottomDowel.position.set(0, 0, -dowelOffsetZ);
-  root.add(bottomDowel);
-
-  // --- Keys (Slats) ---
-  // 10 red wooden slats, increasing in length from left to right.
-  // The first two are narrower than the rest.
+  // --- Bars ---
+  const barGeomBase = new THREE.BoxGeometry(barWidth, barHeight, 1); // Depth 1, scaled per bar
   
-  const keyThickness = 0.028;
-  const keyGap = 0.015;
-  const baseWidth = 0.045;
-  const narrowWidth = 0.032;
-  
-  const minLength = 0.13;
-  const maxLength = 0.23;
+  // Hole geometry (small cylinder to simulate hole on top surface)
+  const holeGeom = new THREE.CylinderGeometry(0.018, 0.018, 0.01, 12);
+  holeGeom.rotateZ(Math.PI / 2); // Align with X axis (dowel direction)
 
-  // Calculate total width to center the assembly
-  // 2 narrow + 8 wide + 9 gaps
-  const totalWidth = (2 * narrowWidth) + (8 * baseWidth) + (9 * keyGap);
-  const startX = -totalWidth / 2;
-
-  let currentX = startX;
-
-  for (let i = 0; i < 10; i++) {
-    // Determine dimensions for this key
-    const isNarrow = i < 2;
-    const width = isNarrow ? narrowWidth : baseWidth;
-    
+  for (let i = 0; i < numBars; i++) {
     // Interpolate length
-    const t = i / 9; // 0.0 to 1.0
-    const length = minLength + (maxLength - minLength) * t;
+    const t = i / (numBars - 1);
+    const barLen = minBarLen + (maxBarLen - minBarLen) * t;
 
-    const keyGeom = new THREE.BoxGeometry(width, keyThickness, length);
-    const key = new THREE.Mesh(keyGeom, redWoodMat);
-
-    // Position
-    // Y is 0 (centered on dowels)
-    // X is current position
-    // Z is 0 (centered on dowels)
-    key.position.set(currentX + width / 2, 0, 0);
-
-    // Add a small black cylinder to simulate the hole through the key
-    // This prevents the "clipping" look where the dowel disappears inside the red wood
-    const holeRadius = dowelRadius + 0.002; // Slightly larger than dowel
-    const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, width + 0.004, 12);
-    holeGeom.rotateZ(Math.PI / 2);
+    const bar = new THREE.Mesh(barGeomBase, redWoodMat);
+    bar.scale.set(1, 1, barLen); // Scale Z for length
     
-    // We need two holes per key, aligned with the dowels
-    const holeMat = new THREE.MeshStandardMaterial({ color: 0x3a1a1a, roughness: 0.9 });
-    
-    const hole1 = new THREE.Mesh(holeGeom, holeMat);
-    hole1.position.set(0, 0, dowelOffsetZ);
-    key.add(hole1);
+    // Position along X
+    const barX = startX + i * (barWidth + gap);
+    bar.position.set(barX, 0, 0);
 
-    const hole2 = new THREE.Mesh(holeGeom, holeMat);
-    hole2.position.set(0, 0, -dowelOffsetZ);
-    key.add(hole2);
+    root.add(bar);
 
-    root.add(key);
+    // Add hole markers on top of the bar where dowels pass through
+    // Left dowel hole
+    const holeL = new THREE.Mesh(holeGeom, holeMat);
+    holeL.position.set(0, barHeight / 2 + 0.001, -dowelZOffset);
+    bar.add(holeL);
 
-    // Advance X for next key
-    currentX += width + keyGap;
+    // Right dowel hole
+    const holeR = new THREE.Mesh(holeGeom, holeMat);
+    holeR.position.set(0, barHeight / 2 + 0.001, dowelZOffset);
+    bar.add(holeR);
   }
 
   fitToUnitCube(THREE, root);

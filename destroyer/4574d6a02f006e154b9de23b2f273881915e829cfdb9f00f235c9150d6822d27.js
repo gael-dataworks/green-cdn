@@ -2,248 +2,299 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Brass material: Gold-ish color, moderate metalness (capped at 0.6 for no-env rendering),
-  // low roughness for polish, and emissive to ensure it reads as bright metal.
+  // Brass material: capped metalness for no-env-map rendering, moderate roughness for aged look.
   const brassMat = new THREE.MeshStandardMaterial({
     color: 0xd4af37,
     metalness: 0.6,
-    roughness: 0.35,
-    emissive: 0xaa8822,
-    emissiveIntensity: 0.25,
+    roughness: 0.4,
   });
 
-  // Dark engraved lines material (for the face texture logic, though we bake it into a map)
-  // We will use a DataTexture for the face markings.
+  // Darker brass/bronze for the central pivot area (oxidized look)
+  const bronzeMat = new THREE.MeshStandardMaterial({
+    color: 0x8b7355,
+    metalness: 0.5,
+    roughness: 0.6,
+  });
 
-  // --- Helper: Procedural Face Texture ---
-  function createFaceTexture() {
+  // --- Dimensions ---
+  const radius = 0.5;
+  const thickness = 0.04;
+  const armRadius = 0.012;
+  const armLength = 0.85; // Longer than base radius to overhang slightly
+
+  // --- Procedural Texture for Dial Face ---
+  // Generates concentric circles, radial lines, and tick marks on a brass background.
+  function createDialTexture() {
     const size = 512;
     const data = new Uint8Array(size * size * 4);
-    const baseColor = [212, 175, 55, 255]; // Brass color
-    
-    // Fill base
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = baseColor[0];
-      data[i + 1] = baseColor[1];
-      data[i + 2] = baseColor[2];
-      data[i + 3] = 255;
-    }
+    const brassR = 212, brassG = 175, brassB = 55; // #d4af37
+    const lineR = 40, lineG = 30, lineB = 20;      // Dark engraving color
 
     const cx = size / 2;
     const cy = size / 2;
     const maxR = size / 2 - 10;
 
-    // Helper to draw a pixel
-    function setPixel(x, y, r, g, b) {
-      if (x < 0 || x >= size || y < 0 || y >= size) return;
-      const idx = (Math.floor(y) * size + Math.floor(x)) * 4;
-      data[idx] = r;
-      data[idx + 1] = g;
-      data[idx + 2] = b;
-      data[idx + 3] = 255;
-    }
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const idx = (y * size + x) * 4;
+        
+        // Distance from center
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
 
-    // Draw concentric circles
-    const radii = [0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.25, 0.15];
-    for (const rFrac of radii) {
-      const r = rFrac * maxR;
-      for (let a = 0; a < Math.PI * 2; a += 0.01) {
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
-        setPixel(x, y, 20, 20, 20); // Dark engraving
-        // Thicken line slightly
-        setPixel(x+1, y, 20, 20, 20);
-        setPixel(x, y+1, 20, 20, 20);
-      }
-    }
+        let r = brassR, g = brassG, b = brassB;
 
-    // Draw radial lines (Cardinal directions + diagonals)
-    const angles = [0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, 5*Math.PI/4, 3*Math.PI/2, 7*Math.PI/4];
-    for (const a of angles) {
-      for (let r = 0.2 * maxR; r < maxR; r += 1) {
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
-        setPixel(x, y, 20, 20, 20);
-        setPixel(x+1, y, 20, 20, 20);
-        setPixel(x, y+1, 20, 20, 20);
-      }
-    }
-
-    // Draw outer tick marks
-    for (let i = 0; i < 360; i++) {
-      const a = (i * Math.PI) / 180;
-      const rInner = (i % 5 === 0) ? maxR - 15 : maxR - 8;
-      const rOuter = maxR;
-      
-      for (let r = rInner; r < rOuter; r++) {
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
-        setPixel(x, y, 20, 20, 20);
-      }
-    }
-
-    // Draw some "text" blocks (rectangles) to simulate the numbers/zodiac signs
-    // Just simple dark rectangles at specific angles
-    function drawTextBlock(angle, radius) {
-      const x = cx + Math.cos(angle) * radius;
-      const y = cy + Math.sin(angle) * radius;
-      // Draw a small 10x5 rect
-      for(let dx=-5; dx<5; dx++) {
-        for(let dy=-2; dy<2; dy++) {
-           // Rotate the rect slightly to follow tangent? No, keep simple for now
-           setPixel(x+dx, y+dy, 20, 20, 20);
+        // Concentric circles
+        // Radii at roughly 20%, 35%, 50%, 65%, 80% of maxR
+        const circles = [0.2, 0.35, 0.5, 0.65, 0.8];
+        let onLine = false;
+        
+        for (let i = 0; i < circles.length; i++) {
+          const targetR = circles[i] * maxR;
+          if (Math.abs(dist - targetR) < 2.0) {
+            onLine = true;
+            break;
+          }
         }
+
+        // Radial lines (every 30 degrees = 12 lines, plus 45 deg intermediates)
+        // Normalize angle to 0-2PI
+        let normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
+        // Check proximity to 0, 30, 45, 60, 90... degrees
+        const step = Math.PI / 12; // 15 degrees
+        // We want main lines every 30 deg, minor every 15? Let's do a grid.
+        // Just simple radial lines for the grid look
+        if (dist > 0.1 * maxR && dist < 0.95 * maxR) {
+            // Check if angle is close to a multiple of 15 degrees
+            const rem = normAngle % (Math.PI / 12);
+            if (rem < 0.05 || rem > (Math.PI / 12) - 0.05) {
+                onLine = true;
+            }
+        }
+
+        // Outer tick marks ring
+        if (dist > 0.9 * maxR && dist < 0.98 * maxR) {
+             const tickStep = Math.PI / 36; // 5 degrees
+             const rem = normAngle % tickStep;
+             if (rem < 0.03 || rem > tickStep - 0.03) {
+                 onLine = true;
+             }
+        }
+        
+        // Central crosshair
+        if (Math.abs(dx) < 2.0 || Math.abs(dy) < 2.0) {
+            if (dist < 0.95 * maxR) onLine = true;
+        }
+
+        if (onLine) {
+          r = lineR; g = lineG; b = lineB;
+        }
+
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
       }
-    }
-    
-    // Place some blocks around the rim
-    for(let i=0; i<12; i++) {
-        const a = (i * Math.PI * 2) / 12;
-        drawTextBlock(a, maxR - 25);
     }
 
     const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
+    // Wrap to avoid seams if UVs go slightly over, though cylinder cap usually handles 0-1
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
     return texture;
   }
 
-  const faceMap = createFaceTexture();
-  const faceMat = new THREE.MeshStandardMaterial({
-    map: faceMap,
-    color: 0xffffff, // White to let texture show true color
+  const dialTexture = createDialTexture();
+  const dialFaceMat = new THREE.MeshStandardMaterial({
+    color: 0xd4af37,
     metalness: 0.6,
-    roughness: 0.35,
-    emissive: 0xaa8822,
-    emissiveIntensity: 0.25,
-    side: THREE.FrontSide
+    roughness: 0.4,
+    map: dialTexture,
   });
 
   // --- Base Plate ---
-  // Thick cylinder
-  const baseRadius = 0.45;
-  const baseHeight = 0.04;
-  const baseGeom = new THREE.CylinderGeometry(baseRadius, baseRadius, baseHeight, 64);
+  // Cylinder for the body
+  const baseGeom = new THREE.CylinderGeometry(radius, radius, thickness, 64);
   const basePlate = new THREE.Mesh(baseGeom, brassMat);
-  basePlate.position.y = -baseHeight / 2; // Sit on ground
+  // Cylinder is Y-up by default. We want the top face to be the dial.
+  // The texture needs to be on the top cap. 
+  // Standard CylinderGeometry maps the top cap UVs radially, which is perfect for our texture.
+  // However, we need to assign the textured material to the top face specifically.
+  // CylinderGeometry has 3 groups: side, top, bottom.
+  // Group 1 is top cap.
+  basePlate.material = [brassMat, dialFaceMat, brassMat]; 
+  
   root.add(basePlate);
 
-  // Face Plate (Top surface with texture)
-  // Slightly smaller radius to sit on top, or same radius. Let's make it a thin disc on top.
-  const faceGeom = new THREE.CylinderGeometry(baseRadius * 0.98, baseRadius * 0.98, 0.005, 64);
-  const facePlate = new THREE.Mesh(faceGeom, faceMat);
-  facePlate.position.y = 0.0025; // Just above base center
-  root.add(facePlate);
-
   // --- Central Hub ---
-  const hubRadius = 0.04;
-  const hubHeight = 0.025;
-  const hubGeom = new THREE.CylinderGeometry(hubRadius, hubRadius * 0.9, hubHeight, 32);
-  const hub = new THREE.Mesh(hubGeom, brassMat);
-  hub.position.y = hubHeight / 2 + 0.005;
+  const hubGeom = new THREE.SphereGeometry(0.04, 32, 16);
+  const hub = new THREE.Mesh(hubGeom, bronzeMat);
+  hub.position.y = thickness / 2 + 0.02; // Sit on top of base
   root.add(hub);
 
-  // Central Cap/Nut
-  const capRadius = 0.015;
-  const capHeight = 0.01;
-  const capGeom = new THREE.CylinderGeometry(capRadius, capRadius, capHeight, 16);
-  const cap = new THREE.Mesh(capGeom, brassMat);
-  cap.position.y = hubHeight + 0.005 + capHeight/2;
-  root.add(cap);
+  // --- Arms / Pointers ---
+  // Helper to create an arm
+  function createArm(length, rotX, rotY, rotZ, x, y, z) {
+    const geom = new THREE.CylinderGeometry(armRadius * 0.8, armRadius, length, 16);
+    // Cylinder is Y-up. To point along Z, rotate X by 90. To point along X, rotate Z by 90.
+    // We will orient the cylinder to point along its local +Y initially, then rotate.
+    // Actually, easier: Cylinder is along Y. 
+    // If we want it to lie flat on XZ, rotate X by 90 deg.
+    const mesh = new THREE.Mesh(geom, brassMat);
+    
+    // Pivot point adjustment: Cylinder center is at 0,0,0. We want one end at 0,0,0.
+    // Translate geometry or mesh? Mesh translation is easier for hierarchy, but we are adding to root.
+    // Let's translate the mesh so its bottom is at the origin, then rotate.
+    mesh.position.y = length / 2; 
+    
+    // Apply rotations
+    mesh.rotation.x = rotX;
+    mesh.rotation.y = rotY;
+    mesh.rotation.z = rotZ;
 
-  // --- Arms (Alidades) ---
-  // We need 3 arms visible in the reference.
-  // Arm 1: ~45 degrees (1:30 position), has a sight.
-  // Arm 2: 0 degrees (3 o'clock), rounded tip.
-  // Arm 3: ~210 degrees (7 o'clock), rounded tip.
+    // Apply position offset (all start from center)
+    mesh.position.x += x;
+    mesh.position.y += y;
+    mesh.position.z += z;
 
-  const armLength = baseRadius * 0.85;
-  const armWidth = 0.012;
-  const armThickness = 0.008;
-
-  function createArm(angleDeg, hasSight) {
-    const armGroup = new THREE.Group();
-    
-    // Main rod
-    const rodGeom = new THREE.BoxGeometry(armWidth, armThickness, armLength);
-    // Shift geometry so pivot is at one end (center of hub)
-    rodGeom.translate(0, 0, armLength / 2);
-    
-    const rod = new THREE.Mesh(rodGeom, brassMat);
-    armGroup.add(rod);
-
-    // Tip decoration
-    if (hasSight) {
-      // Sight vane at the end
-      const vaneGeom = new THREE.BoxGeometry(armWidth * 1.5, armThickness * 3, 0.005);
-      const vane = new THREE.Mesh(vaneGeom, brassMat);
-      vane.position.set(0, armThickness * 1.5, armLength);
-      armGroup.add(vane);
-      
-      // Small knob on vane
-      const knobGeom = new THREE.SphereGeometry(armWidth * 0.8, 8, 8);
-      const knob = new THREE.Mesh(knobGeom, brassMat);
-      knob.position.set(0, armThickness * 2.5, armLength);
-      armGroup.add(knob);
-    } else {
-      // Rounded tip (Sphere)
-      const tipGeom = new THREE.SphereGeometry(armWidth * 0.8, 8, 8);
-      const tip = new THREE.Mesh(tipGeom, brassMat);
-      tip.position.set(0, 0, armLength);
-      armGroup.add(tip);
-    }
-
-    // Rotate to angle
-    // In Three.js, 0 rotation is +X? No, default box is centered.
-    // We translated rod to +Z. So rotation around Y axis.
-    // 0 deg = +Z. 
-    // Reference: 3 o'clock is +X? 
-    // Let's align: 0 deg = +X (3 o'clock).
-    // So we need to rotate -90 deg (or 270) to point +Z initially if we want 0 to be 3 o'clock.
-    // Actually, let's just use standard polar coords.
-    // Angle 0 = +X. Angle 90 = +Z? No, usually Angle 0 = +X, Angle 90 = +Y (in 2D).
-    // In XZ plane: x = cos(a), z = sin(a).
-    // If a=0, x=1, z=0 (+X).
-    // If a=90 (PI/2), x=0, z=1 (+Z).
-    // So rotation.y = -angle (since Three.js Y rotation is clockwise from top? No, counter-clockwise).
-    // Let's just set rotation.y directly.
-    
-    const rad = (angleDeg * Math.PI) / 180;
-    // To point at angle 'rad' in XZ plane (0 is +X):
-    // We need the object (which points +Z by default after translation) to rotate.
-    // If object points +Z, and we want it to point +X (0 deg), we rotate -90 deg (-PI/2).
-    // If we want it to point +Z (90 deg), we rotate 0.
-    // So rotation.y = PI/2 - rad.
-    
-    armGroup.rotation.y = (Math.PI / 2) - rad;
-    
-    // Lift slightly above face
-    armGroup.position.y = 0.015;
-    
-    return armGroup;
+    return mesh;
   }
 
-  // Arm 1: ~45 degrees (NE) - Has Sight
-  const arm1 = createArm(45, true);
-  root.add(arm1);
+  const pivotY = thickness / 2 + 0.02;
 
-  // Arm 2: 0 degrees (E) - Rounded
-  const arm2 = createArm(0, false);
-  root.add(arm2);
+  // Arm 1: The Gnomon (Long, angled up)
+  // Points roughly to 1 o'clock in the image, angled up.
+  // Let's say it points in XZ plane at -45 deg (towards +X, -Z? No, image shows +X, +Z roughly).
+  // Image: Top-right. Let's aim for +X, +Z diagonal.
+  // Angle up: ~30-40 degrees from horizontal.
+  const gnomon = createArm(armLength, -Math.PI / 6, Math.PI / 4, 0, 0, pivotY, 0);
+  // Correction: createArm puts pivot at bottom. 
+  // We need to rotate around the bottom point (0, pivotY, 0).
+  // My helper sets position.y = length/2, so center is at length/2. Bottom is at 0.
+  // So rotation happens around the center unless we change pivot.
+  // Better approach: Create a Group for each arm, add mesh to group, offset mesh in group, rotate group.
+  
+  function addArm(length, angleX, angleY, angleZ) {
+      const group = new THREE.Group();
+      group.position.set(0, pivotY, 0);
+      
+      const geom = new THREE.CylinderGeometry(armRadius * 0.7, armRadius * 0.9, length, 16);
+      const mesh = new THREE.Mesh(geom, brassMat);
+      // Offset mesh so bottom is at group origin
+      mesh.position.y = length / 2;
+      
+      group.add(mesh);
+      
+      // Rotate the group to aim the arm
+      group.rotation.x = angleX;
+      group.rotation.y = angleY;
+      group.rotation.z = angleZ;
+      
+      root.add(group);
+      return group;
+  }
 
-  // Arm 3: ~210 degrees (SW) - Rounded
-  const arm3 = createArm(210, false);
-  root.add(arm3);
+  // 1. Main Gnomon: Angled up (~50 deg) and to the right (~45 deg azimuth)
+  // In image, it points to top-right.
+  addArm(armLength, -Math.PI / 3.5, Math.PI / 4, 0);
 
-  // --- Shadow/Detail under arms (Optional but adds depth) ---
-  // A thin dark disc under the hub to simulate the pivot shadow/gap
-  const shadowGeom = new THREE.CircleGeometry(hubRadius * 1.2, 32);
-  const shadowMat = new THREE.MeshStandardMaterial({ color: 0x332200, roughness: 1.0 });
-  const shadow = new THREE.Mesh(shadowGeom, shadowMat);
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.014;
-  root.add(shadow);
+  // 2. Horizontal Arm: Points Right (+X)
+  // Rotate -90 deg around Z to point along +X (since cylinder is Y-up)
+  // Wait, if cylinder is Y-up, rotating Z by -90 makes it point +X.
+  // But I'm using group rotation.
+  // Default cylinder points +Y.
+  // To point +X: Rotate Z -90 (or 270).
+  // To point +Z: Rotate X 90.
+  // To point -X: Rotate Z 90.
+  // To point -Z: Rotate X -90.
+  
+  // Let's restart the arm logic to be precise.
+  // Clear previous arm attempts from logic, implement cleanly below.
+  while(root.children.length > 2) { root.remove(root.children[2]); } // Remove temp arms
 
+  // Re-implement arms cleanly
+  function makePointer(len, rotOrder) {
+      const g = new THREE.Group();
+      g.position.set(0, pivotY, 0);
+      const m = new THREE.Mesh(
+          new THREE.CylinderGeometry(armRadius * 0.6, armRadius, len, 12),
+          brassMat
+      );
+      m.position.y = len / 2;
+      g.add(m);
+      
+      // Apply rotations based on target direction
+      // Default is +Y.
+      if (rotOrder === 'right') { // +X
+          g.rotation.z = -Math.PI / 2;
+      } else if (rotOrder === 'left') { // -X
+          g.rotation.z = Math.PI / 2;
+      } else if (rotOrder === 'front') { // +Z
+          g.rotation.x = Math.PI / 2;
+      } else if (rotOrder === 'back') { // -Z
+          g.rotation.x = -Math.PI / 2;
+      } else if (rotOrder === 'up_right') {
+          // Angled up and right
+          g.rotation.z = -Math.PI / 3; // Tilt towards X
+          g.rotation.x = -Math.PI / 4; // Tilt up
+      } else if (rotOrder === 'down_left') {
+          // On the dial face, pointing down-left
+          g.rotation.z = Math.PI / 2; // Point -X
+          g.rotation.x = -Math.PI / 4; // Tilt down into the dial? No, lie on dial.
+          // If lying on dial (XZ plane), we need to rotate X by 90 first to lay flat, then rotate Y for angle.
+          // Let's use a simpler vector approach.
+      }
+      root.add(g);
+  }
+
+  // Let's use a generic vector-based arm creator
+  function addVectorArm(len, x, y, z) {
+      const group = new THREE.Group();
+      group.position.set(0, pivotY, 0);
+      
+      const mesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(armRadius * 0.6, armRadius * 0.9, len, 12),
+          brassMat
+      );
+      mesh.position.y = len / 2;
+      group.add(mesh);
+      
+      // Orient group to look at direction (x, y, z)
+      // Default up is Y. We want the cylinder (local Y) to point along (x,y,z).
+      // So we just rotate the group.
+      const target = new THREE.Vector3(x, y, z).normalize();
+      // We need a quaternion to rotate (0,1,0) to target
+      const v1 = new THREE.Vector3(0, 1, 0);
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(v1, target);
+      group.quaternion.copy(quaternion);
+      
+      root.add(group);
+  }
+
+  // Based on image analysis:
+  // 1. Long arm pointing Up-Right (Gnomon). Vector: (1, 1, 0) roughly.
+  addVectorArm(armLength, 1, 0.8, 0.5); 
+  
+  // 2. Horizontal arm pointing Right. Vector: (1, 0, 0).
+  addVectorArm(armLength * 0.9, 1, 0, 0);
+
+  // 3. Short arm pointing Down-Left. Vector: (-1, 0, -1).
+  addVectorArm(armLength * 0.5, -1, 0, -1);
+
+  // 4. Short arm pointing Down-Right. Vector: (1, 0, -1).
+  addVectorArm(armLength * 0.5, 1, 0, -1);
+
+  // Central decorative cap on top of the pivot
+  const capGeom = new THREE.SphereGeometry(armRadius * 1.5, 16, 8);
+  const cap = new THREE.Mesh(capGeom, bronzeMat);
+  cap.position.set(0, pivotY + 0.01, 0);
+  root.add(cap);
+
+  // --- Normalization ---
   fitToUnitCube(THREE, root);
   return root;
 }

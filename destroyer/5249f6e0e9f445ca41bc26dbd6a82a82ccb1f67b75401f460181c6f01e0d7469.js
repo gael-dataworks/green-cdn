@@ -1,150 +1,121 @@
 export default function generate(THREE) {
-  // --- Constants & Dimensions ---
-  const TABLE_SIZE = 1.0;
-  const TOP_THICKNESS = 0.05;
-  const LEG_HEIGHT = 0.45;
-  const LEG_WIDTH = 0.09;
-  const APRON_HEIGHT = 0.10;
-  const APRON_THICKNESS = 0.04;
-  const OVERHANG = 0.04;
+  const root = new THREE.Group();
 
-  // --- Material: Rustic Wood ---
-  // Generate a procedural wood texture with grain and knots
-  const texSize = 256;
-  const data = new Uint8Array(texSize * texSize * 4);
-  
-  // Base wood color components
-  const baseR = 110, baseG = 85, baseB = 60; 
-  const grainR = 80, grainG = 60, grainB = 40;
-  const knotR = 40, knotG = 30, knotB = 20;
-
-  for (let y = 0; y < texSize; y++) {
-    for (let x = 0; x < texSize; x++) {
-      const i = (y * texSize + x) * 4;
-      
-      // Simple deterministic noise based on coordinates
-      const noise = Math.sin(x * 0.05) * Math.cos(y * 0.05) * 20 + 
-                    Math.sin(x * 0.2 + y * 0.1) * 10;
-      
-      // Grain lines (vertical streaks)
-      const grain = (Math.sin(x * 0.1) > 0.8) ? -30 : 0;
-      
-      // Occasional knots (dark circles)
-      let knot = 0;
-      const cx1 = 64, cy1 = 64, cr1 = 15;
-      const cx2 = 190, cy2 = 180, cr2 = 10;
-      const dist1 = Math.sqrt((x - cx1) ** 2 + (y - cy1) ** 2);
-      const dist2 = Math.sqrt((x - cx2) ** 2 + (y - cy2) ** 2);
-      
-      if (dist1 < cr1) knot = -50 * (1 - dist1/cr1);
-      if (dist2 < cr2) knot = -50 * (1 - dist2/cr2);
-
-      const r = Math.max(0, Math.min(255, baseR + noise + grain + knot));
-      const g = Math.max(0, Math.min(255, baseG + noise * 0.8 + grain * 0.8 + knot));
-      const b = Math.max(0, Math.min(255, baseB + noise * 0.6 + grain * 0.6 + knot));
-
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = 255;
-    }
-  }
-
-  const woodTexture = new THREE.DataTexture(data, texSize, texSize, THREE.RGBAFormat);
-  woodTexture.colorSpace = THREE.SRGBColorSpace;
-  woodTexture.wrapS = THREE.RepeatWrapping;
-  woodTexture.wrapT = THREE.RepeatWrapping;
-  woodTexture.repeat.set(2, 2);
-  woodTexture.needsUpdate = true;
-
+  // --- Materials ---
+  // Weathered wood: medium brown, high roughness, no metalness.
   const woodMat = new THREE.MeshStandardMaterial({
-    map: woodTexture,
-    color: 0xffffff, // Tint white to let texture dominate
+    color: 0x967E65,
     metalness: 0.0,
     roughness: 0.85,
   });
 
-  const root = new THREE.Group();
+  // Darker wood for knots/pegs/details to add contrast.
+  const detailMat = new THREE.MeshStandardMaterial({
+    color: 0x3e3228,
+    metalness: 0.0,
+    roughness: 0.9,
+  });
 
-  // --- 1. Table Top (4 Planks) ---
-  const plankWidth = (TABLE_SIZE - 0.02) / 4; // Small gaps between planks
-  const plankLength = TABLE_SIZE;
+  // --- Dimensions ---
+  const tableSize = 0.80;      // Width/Depth of top
+  const topThickness = 0.05;   // Thickness of top planks
+  const legHeight = 0.40;      // Length of legs
+  const legSize = 0.09;        // Width/Depth of legs
+  const apronHeight = 0.08;    // Height of the frame under top
+  const apronThickness = 0.04; // Thickness of apron beams
+  const overhang = 0.06;       // How much top sticks out past legs
+
+  // --- 1. Table Top (3 Planks) ---
+  // The top is made of 3 distinct planks to show seams.
+  const plankWidth = tableSize / 3;
+  const plankLength = tableSize;
   
   const topGroup = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
+  
+  for (let i = -1; i <= 1; i++) {
     const plank = new THREE.Mesh(
-      new THREE.BoxGeometry(plankWidth, TOP_THICKNESS, plankLength),
+      new THREE.BoxGeometry(plankWidth - 0.002, topThickness, plankLength), 
       woodMat
     );
     // Position planks side by side along X axis
-    const xPos = -TABLE_SIZE / 2 + (plankWidth / 2) + (i * plankWidth) + 0.01;
-    plank.position.set(xPos, LEG_HEIGHT + APRON_HEIGHT / 2, 0);
-    // Slight random rotation for rustic look (deterministic based on index)
-    plank.rotation.z = (i % 2 === 0 ? 0.01 : -0.01);
-    plank.rotation.x = (i % 3 === 0 ? 0.01 : 0);
+    plank.position.set(i * (plankWidth / 2), legHeight / 2 + topThickness / 2, 0);
     topGroup.add(plank);
+    
+    // Add subtle "knot" details on top surface for realism
+    if (i === 0) {
+      const knot = new THREE.Mesh(new THREE.CircleGeometry(0.015, 8), detailMat);
+      knot.rotation.x = -Math.PI / 2;
+      knot.position.set(0, topThickness / 2 + 0.001, -0.15);
+      topGroup.add(knot);
+    } else if (i === -1) {
+      const knot = new THREE.Mesh(new THREE.CircleGeometry(0.012, 8), detailMat);
+      knot.rotation.x = -Math.PI / 2;
+      knot.position.set(-0.1, topThickness / 2 + 0.001, 0.2);
+      topGroup.add(knot);
+    }
   }
   root.add(topGroup);
 
-  // --- 2. Apron (Frame under top) ---
-  const apronGroup = new THREE.Group();
-  const frameInnerSize = TABLE_SIZE - (LEG_WIDTH * 2) - (OVERHANG * 2) + 0.02;
-  const frameCenterOffset = (TABLE_SIZE - LEG_WIDTH - OVERHANG) / 2 - LEG_WIDTH/2;
-
-  // Front & Back Apron
-  const apronLong = new THREE.Mesh(
-    new THREE.BoxGeometry(TABLE_SIZE - LEG_WIDTH * 2 - OVERHANG * 2 + 0.02, APRON_HEIGHT, APRON_THICKNESS),
-    woodMat
-  );
-  // Front
-  const apronFront = apronLong.clone();
-  apronFront.position.set(0, LEG_HEIGHT, TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG + APRON_THICKNESS/2);
-  apronGroup.add(apronFront);
-  // Back
-  const apronBack = apronLong.clone();
-  apronBack.position.set(0, LEG_HEIGHT, -(TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG + APRON_THICKNESS/2));
-  apronGroup.add(apronBack);
-
-  // Left & Right Apron
-  const apronShort = new THREE.Mesh(
-    new THREE.BoxGeometry(APRON_THICKNESS, APRON_HEIGHT, TABLE_SIZE - LEG_WIDTH * 2 - OVERHANG * 2 + 0.02),
-    woodMat
-  );
-  // Left
-  const apronLeft = apronShort.clone();
-  apronLeft.position.set(-(TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG + APRON_THICKNESS/2), LEG_HEIGHT, 0);
-  apronGroup.add(apronLeft);
-  // Right
-  const apronRight = apronShort.clone();
-  apronRight.position.set((TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG + APRON_THICKNESS/2), LEG_HEIGHT, 0);
-  apronGroup.add(apronRight);
-
-  root.add(apronGroup);
-
-  // --- 3. Legs ---
-  const legGroup = new THREE.Group();
-  const legGeom = new THREE.BoxGeometry(LEG_WIDTH, LEG_HEIGHT, LEG_WIDTH);
-  
+  // --- 2. Legs (4 Corners) ---
+  const legGeom = new THREE.BoxGeometry(legSize, legHeight, legSize);
   const legPositions = [
-    { x: 1, z: 1 },
-    { x: -1, z: 1 },
-    { x: 1, z: -1 },
-    { x: -1, z: -1 }
+    [1, 1], [-1, 1], [1, -1], [-1, -1] // x, z signs
   ];
 
-  legPositions.forEach((pos, idx) => {
+  const legGroup = new THREE.Group();
+  for (const [sx, sz] of legPositions) {
     const leg = new THREE.Mesh(legGeom, woodMat);
-    const x = pos.x * (TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG / 2);
-    const z = pos.z * (TABLE_SIZE / 2 - LEG_WIDTH / 2 - OVERHANG / 2);
-    leg.position.set(x, LEG_HEIGHT / 2, z);
-    
-    // Slight taper or irregularity for rustic feel
-    leg.scale.set(1 + idx * 0.01, 1, 1 - idx * 0.01);
-    
+    // Position legs inset from the edge
+    const offset = (tableSize / 2) - (legSize / 2) - overhang + 0.02;
+    leg.position.set(sx * offset, 0, sz * offset);
     legGroup.add(leg);
-  });
-
+    
+    // Add peg/bolt detail on the inner side of the leg (facing center)
+    // Visible in reference as dark spots near the top of the leg
+    const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.02, 8), detailMat);
+    peg.rotation.z = Math.PI / 2; // Point towards center
+    // Place on the face facing the center
+    const pegOffset = legSize / 2 + 0.005;
+    peg.position.set(sx * -pegOffset, legHeight / 2 - 0.05, sz * -pegOffset); 
+    legGroup.add(peg);
+  }
   root.add(legGroup);
+
+  // --- 3. Apron (Frame under top) ---
+  // Connects the legs. Two long beams (Z-axis), two short beams (X-axis).
+  const apronGroup = new THREE.Group();
+  
+  // Long beams (Front and Back)
+  const longBeamLen = tableSize - (legSize + 0.04) * 2 + (legSize); // Span between leg centers roughly
+  const longBeamZ = (tableSize / 2) - (legSize / 2) - overhang + 0.04;
+  
+  const longBeamGeom = new THREE.BoxGeometry(legSize, apronHeight, longBeamLen);
+  for (const sz of [-1, 1]) {
+    const beam = new THREE.Mesh(longBeamGeom, woodMat);
+    beam.position.set(0, legHeight / 2 - apronHeight / 2, sz * longBeamZ);
+    apronGroup.add(beam);
+    
+    // Add pegs on the beam facing out
+    for (const sx of [-1, 1]) {
+       const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.015, 6), detailMat);
+       peg.rotation.z = Math.PI / 2;
+       peg.position.set(sx * (legSize/2 + 0.005), 0, sz * longBeamZ);
+       apronGroup.add(peg);
+    }
+  }
+
+  // Short beams (Left and Right) - fit between the long beams
+  const shortBeamLen = tableSize - (legSize + 0.04) * 2 + (legSize) - apronThickness * 2;
+  const shortBeamX = (tableSize / 2) - (legSize / 2) - overhang + 0.04;
+
+  const shortBeamGeom = new THREE.BoxGeometry(shortBeamLen, apronHeight, apronThickness);
+  for (const sx of [-1, 1]) {
+    const beam = new THREE.Mesh(shortBeamGeom, woodMat);
+    beam.position.set(sx * shortBeamX, legHeight / 2 - apronHeight / 2, 0);
+    apronGroup.add(beam);
+  }
+  
+  root.add(apronGroup);
 
   // --- Normalization ---
   fitToUnitCube(THREE, root);

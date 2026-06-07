@@ -2,231 +2,197 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Gold: Polished metal. Rules: metalness <= 0.6, add emissive for brightness.
+  // Gold: Bright, reflective, with emissive boost per metal brightness rules.
   const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xD4AF37,
+    color: 0xd4af37,
     metalness: 0.6,
-    roughness: 0.2,
-    emissive: 0xD4AF37,
-    emissiveIntensity: 0.35,
+    roughness: 0.3,
+    emissive: 0xd4af37,
+    emissiveIntensity: 0.4,
   });
 
-  // Emerald: Green physical material with transmission for gem look.
+  // Emerald: Green, translucent, glossy.
   const emeraldMat = new THREE.MeshPhysicalMaterial({
-    color: 0x009944,
-    metalness: 0.0,
-    roughness: 0.1,
-    transmission: 0.7,
-    ior: 1.57,
-    transparent: true,
-  });
-
-  // Ruby: Red physical material.
-  const rubyMat = new THREE.MeshPhysicalMaterial({
-    color: 0xCC0000,
+    color: 0x00aa55,
     metalness: 0.0,
     roughness: 0.1,
     transmission: 0.6,
-    ior: 1.54,
+    ior: 1.57,
     transparent: true,
+    thickness: 0.5,
+  });
+
+  // Ruby: Red, translucent, glossy.
+  const rubyMat = new THREE.MeshPhysicalMaterial({
+    color: 0xdd0000,
+    metalness: 0.0,
+    roughness: 0.1,
+    transmission: 0.6,
+    ior: 1.76,
+    transparent: true,
+    thickness: 0.5,
   });
 
   // --- Dimensions ---
-  const totalLength = 1.0;
-  const totalWidth = 0.34;
-  const baseThickness = 0.04;
-  const stoneHeight = 0.05;
+  const barLength = 1.2;
+  const barWidth = 0.38;
+  const barThickness = 0.06;
+  const stoneHeight = 0.08;
   
-  const largeStoneLength = 0.32;
-  const largeStoneWidth = 0.11;
-  const centerRubyRadius = 0.045;
-  const smallStoneRadius = 0.022;
-  const smallStoneSpacing = 0.048;
+  const emeraldLength = 0.32;
+  const emeraldWidth = 0.14;
+  const rubyRadius = 0.055;
+  const paveRadius = 0.022;
 
-  // --- Base Plate ---
-  // Rounded rectangle approximation using BoxGeometry with slight scale
-  const baseGeom = new THREE.BoxGeometry(totalLength, baseThickness, totalWidth);
-  const gold_base = new THREE.Mesh(baseGeom, goldMat);
-  // Slightly round the corners by scaling or just keep it boxy for low-poly style
-  // To make it look like a brooch, let's add a subtle rim on the base
-  gold_base.position.y = 0;
-  root.add(gold_base);
+  // --- Base Plate (Gold) ---
+  // Rounded rectangle shape for extrusion
+  const shape = new THREE.Shape();
+  const w = barWidth / 2;
+  const h = barLength / 2;
+  const r = 0.06; // corner radius
+  shape.moveTo(-w + r, -h);
+  shape.lineTo(w - r, -h);
+  shape.quadraticCurveTo(w, -h, w, -h + r);
+  shape.lineTo(w, h - r);
+  shape.quadraticCurveTo(w, h, w - r, h);
+  shape.lineTo(-w + r, h);
+  shape.quadraticCurveTo(-w, h, -w, h - r);
+  shape.lineTo(-w, -h + r);
+  shape.quadraticCurveTo(-w, -h, -w + r, -h);
 
-  // Base Rim (slightly smaller box on top to create a ledge)
-  const rimGeom = new THREE.BoxGeometry(totalLength * 0.96, baseThickness * 0.8, totalWidth * 0.96);
-  const gold_rim_base = new THREE.Mesh(rimGeom, goldMat);
-  gold_rim_base.position.y = baseThickness * 0.1;
-  root.add(gold_rim_base);
-
-  // --- Large Emeralds (Baguette Cut) ---
-  // Using BoxGeometry scaled to look like a cut gem
-  const largeEmeraldGeom = new THREE.BoxGeometry(largeStoneLength, stoneHeight, largeStoneWidth);
+  const baseGeom = new THREE.ExtrudeGeometry(shape, {
+    depth: barThickness,
+    bevelEnabled: true,
+    bevelThickness: 0.01,
+    bevelSize: 0.01,
+    bevelSegments: 2,
+    steps: 1,
+  });
+  // Center the extrusion
+  baseGeom.translate(0, barThickness / 2, 0);
   
-  const left_emerald = new THREE.Mesh(largeEmeraldGeom, emeraldMat);
-  left_emerald.position.set(-largeStoneLength / 2 - 0.02, baseThickness + stoneHeight / 2, 0);
-  root.add(left_emerald);
+  const basePlate = new THREE.Mesh(baseGeom, goldMat);
+  root.add(basePlate);
 
-  const right_emerald = new THREE.Mesh(largeEmeraldGeom, emeraldMat);
-  right_emerald.position.set(largeStoneLength / 2 + 0.02, baseThickness + stoneHeight / 2, 0);
-  root.add(right_emerald);
+  // --- Helper: Add Rectangular Stone with Bezel ---
+  function addEmerald(zPos) {
+    // Gold Bezel (Frame)
+    const bezelGeom = new THREE.BoxGeometry(emeraldWidth + 0.012, barThickness + 0.01, emeraldLength + 0.012);
+    // Cut out the center visually by making the stone sit on top, or use a frame mesh.
+    // Let's make a frame using a slightly larger box and a slightly smaller box subtracted? 
+    // No CSG. Let's just make a thin frame mesh.
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(emeraldWidth + 0.012, 0.015, emeraldLength + 0.012), goldMat);
+    frame.position.set(0, barThickness + 0.005, zPos);
+    root.add(frame);
 
-  // Bezels for Large Emeralds (Thin gold frames)
-  const bezelThickness = 0.008;
-  const largeBezelGeom = new THREE.BoxGeometry(largeStoneLength + bezelThickness * 2, stoneHeight * 0.6, largeStoneWidth + bezelThickness * 2);
-  // We need a frame, so we can use a thin box or just rely on the base. 
-  // Let's add a thin gold plate underneath the stones to act as the setting floor
-  const settingFloorGeom = new THREE.BoxGeometry(largeStoneLength + 0.01, 0.005, largeStoneWidth + 0.01);
-  const left_setting = new THREE.Mesh(settingFloorGeom, goldMat);
-  left_setting.position.copy(left_emerald.position);
-  left_setting.position.y = baseThickness + 0.002;
-  root.add(left_setting);
+    // Inner Gold floor (optional, makes it look set)
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(emeraldWidth - 0.005, 0.005, emeraldLength - 0.005), goldMat);
+    floor.position.set(0, barThickness + 0.002, zPos);
+    root.add(floor);
 
-  const right_setting = new THREE.Mesh(settingFloorGeom, goldMat);
-  right_setting.position.copy(right_emerald.position);
-  right_setting.position.y = baseThickness + 0.002;
-  root.add(right_setting);
+    // The Stone
+    // Use BoxGeometry for emerald cut look
+    const stoneGeom = new THREE.BoxGeometry(emeraldWidth - 0.01, stoneHeight, emeraldLength - 0.01);
+    const stone = new THREE.Mesh(stoneGeom, emeraldMat);
+    stone.position.set(0, barThickness + stoneHeight / 2, zPos);
+    root.add(stone);
+  }
 
-  // --- Center Ruby ---
-  const rubyGeom = new THREE.SphereGeometry(centerRubyRadius, 16, 16);
-  const center_ruby = new THREE.Mesh(rubyGeom, rubyMat);
-  center_ruby.position.set(0, baseThickness + centerRubyRadius, 0);
-  root.add(center_ruby);
+  // --- Helper: Add Round Stone with Bezel ---
+  function addRuby() {
+    // Gold Bezel (Torus)
+    const bezelGeom = new THREE.TorusGeometry(rubyRadius + 0.012, 0.012, 8, 24);
+    const bezel = new THREE.Mesh(bezelGeom, goldMat);
+    bezel.rotation.x = Math.PI / 2;
+    bezel.position.set(0, barThickness + 0.01, 0);
+    root.add(bezel);
 
-  // Ruby Bezel (Torus or Cylinder ring)
-  const rubyBezelGeom = new THREE.TorusGeometry(centerRubyRadius + 0.008, 0.006, 8, 24);
-  const ruby_bezel = new THREE.Mesh(rubyBezelGeom, goldMat);
-  ruby_bezel.rotation.x = Math.PI / 2;
-  ruby_bezel.position.set(0, baseThickness + 0.005, 0);
-  root.add(ruby_bezel);
+    // The Stone (Sphere for round brilliant)
+    const stoneGeom = new THREE.SphereGeometry(rubyRadius, 16, 16);
+    // Flatten it slightly to look like a set gem
+    stoneGeom.scale(1, 0.8, 1); 
+    const stone = new THREE.Mesh(stoneGeom, rubyMat);
+    stone.position.set(0, barThickness + rubyRadius * 0.8, 0);
+    root.add(stone);
+  }
 
-  // --- Small Emeralds (Pave Border) ---
-  // We will use InstancedMesh for performance and cleanliness
-  // Calculate positions for a border around the rectangle
-  const smallEmeraldGeom = new THREE.SphereGeometry(smallStoneRadius, 8, 8);
-  const smallEmeraldMat = emeraldMat; // Reuse material
+  // --- Helper: Add Pavé Stone ---
+  function addPave(x, z) {
+    const geom = new THREE.SphereGeometry(paveRadius, 8, 8);
+    // Flatten slightly
+    geom.scale(1, 0.8, 1);
+    const stone = new THREE.Mesh(geom, emeraldMat);
+    stone.position.set(x, barThickness + paveRadius * 0.8, z);
+    root.add(stone);
+
+    // Tiny gold bead setting (optional, adds realism)
+    // const bead = new THREE.Mesh(new THREE.TorusGeometry(paveRadius + 0.005, 0.004, 4, 8), goldMat);
+    // bead.rotation.x = Math.PI / 2;
+    // bead.position.copy(stone.position);
+    // root.add(bead);
+  }
+
+  // --- Place Main Stones ---
+  // Two emeralds separated by the ruby
+  const emeraldOffset = 0.26;
+  addEmerald(-emeraldOffset);
+  addEmerald(emeraldOffset);
+  addRuby();
+
+  // --- Place Pavé Stones ---
+  // We need to fill the gaps between the main stones and line the edges.
   
-  // Estimate count: Perimeter ~ 2*(1.0 + 0.34) = 2.68. Spacing 0.05 -> ~54 stones?
-  // Image shows roughly 2 rows on sides, 1 on ends. Let's aim for ~40 instances.
-  const maxSmallStones = 60;
-  const smallEmeralds = new THREE.InstancedMesh(smallEmeraldGeom, smallEmeraldMat, maxSmallStones);
+  // 1. Top and Bottom Edges
+  const edgeZStart = -barLength / 2 + 0.08;
+  const edgeZEnd = barLength / 2 - 0.08;
+  const edgeX = barWidth / 2 - 0.035;
+  const paveSpacing = 0.055;
   
-  const dummy = new THREE.Object3D();
-  let index = 0;
-
-  // Helper to add a small stone
-  function addSmallStone(x, z) {
-    if (index >= maxSmallStones) return;
-    dummy.position.set(x, baseThickness + smallStoneRadius, z);
-    dummy.updateMatrix();
-    smallEmeralds.setMatrixAt(index, dummy.matrix);
-    index++;
+  for (let z = edgeZStart; z <= edgeZEnd; z += paveSpacing) {
+    // Skip the very center where the ruby is
+    if (Math.abs(z) < 0.08) continue;
+    addPave(-edgeX, z);
+    addPave(edgeX, z);
   }
 
-  // Generate border positions
-  // Top and Bottom rows
-  const borderZ = totalWidth / 2 - 0.02;
-  const startX = -totalLength / 2 + 0.03;
-  const endX = totalLength / 2 - 0.03;
-  const stepX = smallStoneSpacing;
+  // 2. Ends (Left and Right caps)
+  const endZ = barLength / 2 - 0.06;
+  addPave(0, -endZ); // Left end
+  addPave(0, endZ);  // Right end
+  // Add corners to round off the ends
+  addPave(-edgeX * 0.6, -endZ + 0.04);
+  addPave(edgeX * 0.6, -endZ + 0.04);
+  addPave(-edgeX * 0.6, endZ - 0.04);
+  addPave(edgeX * 0.6, endZ - 0.04);
 
-  for (let x = startX; x <= endX; x += stepX) {
-    // Skip the center area where the ruby is to avoid overlap, or let them cluster
-    // The ruby is at 0. The emeralds are at +/- 0.17.
-    // We want stones along the perimeter.
-    addSmallStone(x, borderZ);
-    addSmallStone(x, -borderZ);
-  }
-
-  // Left and Right ends (caps)
-  const capZStart = -borderZ + stepX;
-  const capZEnd = borderZ - stepX;
-  for (let z = capZStart; z <= capZEnd; z += stepX) {
-    addSmallStone(-totalLength / 2 + 0.02, z);
-    addSmallStone(totalLength / 2 - 0.02, z);
-  }
-
-  // Inner border between large emeralds and ruby? 
-  // The image shows small stones separating the large emeralds from the rim, 
-  // and also between the emeralds and the ruby.
-  // Let's add a row between the two large emeralds (above and below the ruby)
-  const gapXStart = -largeStoneLength / 2 + 0.05;
-  const gapXEnd = largeStoneLength / 2 - 0.05;
-  // Only fill if not overlapping ruby
-  // Ruby radius 0.045. 
-  for (let x = gapXStart; x <= -0.06; x += stepX) {
-     addSmallStone(x, 0.16); // Above gap
-     addSmallStone(x, -0.16); // Below gap
-  }
-  for (let x = 0.06; x <= gapXEnd; x += stepX) {
-     addSmallStone(x, 0.16);
-     addSmallStone(x, -0.16);
-  }
+  // 3. Inner Fillers (Between Emeralds and Ruby)
+  // Gap is roughly from z=0.15 to z=0.26 (and negative side)
+  // Place 2-3 stones in the gap on top and bottom
+  const innerGapStart = 0.16;
+  const innerGapEnd = 0.24;
+  const innerX = 0.08; // Closer to center
   
-  // Add stones immediately next to the ruby on X axis
-  addSmallStone(-0.06, 0);
-  addSmallStone(0.06, 0);
-
-  smallEmeralds.instanceMatrix.needsUpdate = true;
-  root.add(smallEmeralds);
-
-  // --- Small Stone Bezels (Instanced) ---
-  // Tiny gold rings under each small stone
-  const smallBezelGeom = new THREE.TorusGeometry(smallStoneRadius + 0.004, 0.003, 6, 12);
-  const smallBezels = new THREE.InstancedMesh(smallBezelGeom, goldMat, index); // Use actual count
-  const bezelDummy = new THREE.Object3D();
+  // Top inner
+  addPave(-innerX, -innerGapStart);
+  addPave(innerX, -innerGapStart);
+  addPave(-innerX, innerGapStart);
+  addPave(innerX, innerGapStart);
   
-  // We need to re-iterate or store positions. To keep code compact, 
-  // we can just re-calculate the loop logic or assume the matrix data is consistent.
-  // Since I can't easily retrieve the matrix from InstancedMesh without overhead in this generator context,
-  // I will re-run the logic briefly for the bezels using the same index count.
-  
-  let bIndex = 0;
-  function addSmallBezel(x, z) {
-    if (bIndex >= index) return;
-    bezelDummy.position.set(x, baseThickness + 0.002, z);
-    bezelDummy.rotation.x = Math.PI / 2;
-    bezelDummy.updateMatrix();
-    smallBezels.setMatrixAt(bIndex, bezelDummy.matrix);
-    bIndex++;
-  }
+  // Maybe a second row closer to ruby?
+  addPave(-innerX * 0.5, -0.09);
+  addPave(innerX * 0.5, -0.09);
+  addPave(-innerX * 0.5, 0.09);
+  addPave(innerX * 0.5, 0.09);
 
-  // Repeat logic for bezels
-  for (let x = startX; x <= endX; x += stepX) {
-    addSmallBezel(x, borderZ);
-    addSmallBezel(x, -borderZ);
-  }
-  for (let z = capZStart; z <= capZEnd; z += stepX) {
-    addSmallBezel(-totalLength / 2 + 0.02, z);
-    addSmallBezel(totalLength / 2 - 0.02, z);
-  }
-  for (let x = gapXStart; x <= -0.06; x += stepX) {
-     addSmallBezel(x, 0.16);
-     addSmallBezel(x, -0.16);
-  }
-  for (let x = 0.06; x <= gapXEnd; x += stepX) {
-     addSmallBezel(x, 0.16);
-     addSmallBezel(x, -0.16);
-  }
-  addSmallBezel(-0.06, 0);
-  addSmallBezel(0.06, 0);
+  // --- Back Clasp (Simple hint) ---
+  // A small gold loop or box at the bottom center back
+  const claspGeom = new THREE.BoxGeometry(0.08, 0.02, 0.15);
+  const clasp = new THREE.Mesh(claspGeom, goldMat);
+  clasp.position.set(0, -0.02, 0.2); // Slightly offset
+  clasp.rotation.x = 0.2;
+  root.add(clasp);
 
-  smallBezels.instanceMatrix.needsUpdate = true;
-  root.add(smallBezels);
-
-  // --- Clip Mechanism (Back) ---
-  // Simple hinge and pin approximation
-  const clipBaseGeom = new THREE.BoxGeometry(0.6, 0.02, 0.05);
-  const clip_base = new THREE.Mesh(clipBaseGeom, goldMat);
-  clip_base.position.set(0, -baseThickness * 0.5, 0.1);
-  clip_base.rotation.x = 0.2; // Angled slightly
-  root.add(clip_base);
-
-  const hingeGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.15, 12);
-  const hinge = new THREE.Mesh(hingeGeom, goldMat);
-  hinge.rotation.z = Math.PI / 2;
-  hinge.position.set(0, -baseThickness * 0.5, -0.12);
-  root.add(hinge);
-
+  // --- Normalization ---
   fitToUnitCube(THREE, root);
   return root;
 }

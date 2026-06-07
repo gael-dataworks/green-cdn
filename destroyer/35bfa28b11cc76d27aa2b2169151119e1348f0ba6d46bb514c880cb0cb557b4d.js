@@ -1,9 +1,9 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
-  // Silver material: polished metal look.
-  // Per rules: metalness <= 0.6 to avoid blackness without env map.
-  // Use emissive to brighten the metal surface.
+  // --- Materials ---
+  // Polished silver: High metalness (capped at 0.6 for renderer), low roughness.
+  // Emissive is used to simulate bright reflection in a dim environment.
   const silverMat = new THREE.MeshStandardMaterial({
     color: 0xd4d4d4,
     metalness: 0.6,
@@ -12,91 +12,146 @@ export default function generate(THREE) {
     emissiveIntensity: 0.4,
   });
 
-  // --- BODY ---
-  // Bulbous base tapering to a narrower neck.
+  // Dark interior material for spout and lid underside
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    metalness: 0.1,
+    roughness: 0.8,
+  });
+
+  // --- Body ---
+  // Bulbous shape with a foot ring.
+  // Profile points (radius, height)
   const bodyProfile = [
-    new THREE.Vector2(0.00, 0.00), // Center bottom
-    new THREE.Vector2(0.28, 0.00), // Base edge
-    new THREE.Vector2(0.38, 0.25), // Max belly
-    new THREE.Vector2(0.34, 0.55), // Shoulder
-    new THREE.Vector2(0.24, 0.68), // Rim
+    new THREE.Vector2(0.00, 0.00), // Bottom center
+    new THREE.Vector2(0.16, 0.00), // Bottom edge
+    new THREE.Vector2(0.16, 0.04), // Foot start
+    new THREE.Vector2(0.23, 0.35), // Belly max
+    new THREE.Vector2(0.19, 0.58), // Shoulder
+    new THREE.Vector2(0.17, 0.62), // Rim
   ];
   const bodyGeom = new THREE.LatheGeometry(bodyProfile, 32);
   const body = new THREE.Mesh(bodyGeom, silverMat);
   root.add(body);
 
-  // --- LID ---
-  // Domed lid sitting on the rim.
+  // --- Lid ---
+  // Domed lid with a rim that overlaps the body slightly.
   const lidProfile = [
-    new THREE.Vector2(0.23, 0.69), // Inner rim (slightly above body rim)
-    new THREE.Vector2(0.36, 0.72), // Outer edge
-    new THREE.Vector2(0.15, 0.88), // Dome curve
-    new THREE.Vector2(0.05, 0.92), // Knob base
+    new THREE.Vector2(0.17, 0.62), // Inner rim (sits on body)
+    new THREE.Vector2(0.21, 0.63), // Outer rim overhang
+    new THREE.Vector2(0.12, 0.78), // Dome curve
+    new THREE.Vector2(0.05, 0.82), // Knob base
+    new THREE.Vector2(0.00, 0.82), // Top center
   ];
   const lidGeom = new THREE.LatheGeometry(lidProfile, 32);
   const lid = new THREE.Mesh(lidGeom, silverMat);
+  // Lid sits slightly above body rim to allow opening animation conceptually, 
+  // but visually it rests on top.
+  lid.position.y = 0.0; 
   root.add(lid);
 
-  // --- KNOB ---
-  // Small sphere on top of the lid.
-  const knobGeom = new THREE.SphereGeometry(0.055, 32, 32);
+  // --- Knob ---
+  // Small sphere on top of lid.
+  const knobGeom = new THREE.SphereGeometry(0.05, 16, 16);
   const knob = new THREE.Mesh(knobGeom, silverMat);
-  knob.position.y = 0.95;
+  knob.position.y = 0.82;
   root.add(knob);
 
-  // --- SPOUT ---
-  // Hollow tubular spout using LatheGeometry with a wall-thickness profile.
-  // Profile defines inner and outer walls to create a hollow pipe.
-  // Points order: Inner Base -> Inner Tip -> Outer Tip -> Outer Base (closed loop)
+  // --- Spout ---
+  // Tapered tube. Constructed using LatheGeometry rotated 90 degrees.
+  // Profile in local XY space (will be rotated to point along -Z).
+  // Outer wall: Tip radius -> Base radius
+  // Inner wall: Base inner radius -> Tip inner radius
+  const spoutLength = 0.55;
+  const tipRadius = 0.035;
+  const baseRadius = 0.09;
+  const wallThickness = 0.015;
+
   const spoutProfile = [
-    new THREE.Vector2(0.075, 0.00), // Inner base
-    new THREE.Vector2(0.055, 0.25), // Inner neck
-    new THREE.Vector2(0.065, 0.42), // Inner tip
-    new THREE.Vector2(0.085, 0.42), // Outer tip
-    new THREE.Vector2(0.075, 0.25), // Outer neck
-    new THREE.Vector2(0.095, 0.00), // Outer base
+    // Outer wall from tip (x=0) to base (x=spoutLength)
+    new THREE.Vector2(0.00, tipRadius), 
+    new THREE.Vector2(spoutLength, baseRadius),
+    // Inner wall from base to tip
+    new THREE.Vector2(spoutLength, baseRadius - wallThickness),
+    new THREE.Vector2(0.00, tipRadius - wallThickness),
+    new THREE.Vector2(0.00, tipRadius), // Close loop
   ];
-  const spoutGeom = new THREE.LatheGeometry(spoutProfile, 32);
+
+  const spoutGeom = new THREE.LatheGeometry(spoutProfile, 24);
   const spout = new THREE.Mesh(spoutGeom, silverMat);
   
-  // Orient spout: Default Lathe is Y-up. We want it pointing along -X (left).
-  // Rotate 90 deg around Z to lay it on X axis.
-  spout.rotation.z = Math.PI / 2;
-  // Position: Attach to left side of body at shoulder height.
-  // Body radius at y=0.45 is approx 0.36. Overlap slightly to hide seam.
-  spout.position.set(-0.32, 0.45, 0);
+  // Position spout: 
+  // Lathe rotates around Y. We want the spout axis to be Z (pointing -Z).
+  // So we rotate the mesh -90 deg around X.
+  spout.rotation.x = -Math.PI / 2;
+  
+  // Position relative to body center.
+  // Base of spout is at body shoulder height (~0.45) and radius (~0.20).
+  // The spout geometry starts at x=0 (tip) and goes to x=length (base).
+  // We need the base (local x=spoutLength) to be at the body surface.
+  // Body surface is at z = -0.20 (approx).
+  // So mesh position z = -0.20 - spoutLength.
+  spout.position.set(0, 0.45, -0.20 - spoutLength);
+  
+  // Add dark interior to the spout tip for depth
+  const spoutTipGeom = new THREE.CircleGeometry(tipRadius - wallThickness, 16);
+  const spoutTip = new THREE.Mesh(spoutTipGeom, darkMat);
+  spoutTip.rotation.y = Math.PI / 2; // Face outward (-Z)
+  spoutTip.position.set(0, 0, -0.01); // Slightly in front of tip
+  spout.add(spoutTip);
+
   root.add(spout);
 
-  // --- HANDLE ---
-  // C-shaped handle using TubeGeometry.
-  const handlePoints = [
-    new THREE.Vector3(0.34, 0.66, 0.00), // Top attachment (near rim)
-    new THREE.Vector3(0.58, 0.60, 0.00), // Top curve out
-    new THREE.Vector3(0.62, 0.35, 0.00), // Mid curve
-    new THREE.Vector3(0.55, 0.15, 0.00), // Bottom curve in
-    new THREE.Vector3(0.34, 0.15, 0.00), // Bottom attachment
-  ];
-  const handleCurve = new THREE.CatmullRomCurve3(handlePoints);
-  // Radius 0.045 gives a substantial handle thickness.
-  const handleGeom = new THREE.TubeGeometry(handleCurve, 24, 0.045, 12, false);
+  // --- Handle ---
+  // C-shaped loop. Using TorusGeometry with an arc.
+  // Torus lies in XY plane. We need it in YZ plane (vertical loop on side).
+  // Rotate X by 90 deg.
+  const handleRadius = 0.14;
+  const handleTube = 0.025;
+  const handleArc = Math.PI * 1.6; // ~288 degrees, leaves a gap
+  
+  const handleGeom = new THREE.TorusGeometry(handleRadius, handleTube, 16, 32, handleArc);
   const handle = new THREE.Mesh(handleGeom, silverMat);
+  
+  // Orientation:
+  // Default Torus is in XY. Rotate X 90 -> YZ plane.
+  handle.rotation.x = Math.PI / 2;
+  
+  // Position:
+  // Center of the torus arc needs to be on the +Z side of the body.
+  // Body radius at handle height (~0.4) is approx 0.22.
+  // Handle center should be at z = 0.22 + handleRadius.
+  handle.position.set(0, 0.40, 0.22 + handleRadius);
+  
+  // Rotate around Z to align the gap vertically (attachments top and bottom)
+  // The Torus arc starts at angle 0. With rotation.x=90, angle 0 is at +Y.
+  // We want the gap at the top and bottom? 
+  // Actually, standard teapot handles attach at shoulder and hip.
+  // Let's rotate the torus so the gap is at the "back" (away from body) or "front"?
+  // The arc covers most of the circle. The gap is where the handle doesn't exist.
+  // We want the handle loop to face the body.
+  // If we rotate Y by 180, the opening faces -Z (towards body).
+  handle.rotation.y = Math.PI; 
+
   root.add(handle);
 
-  // --- HANDLE LUGS ---
-  // Small attachment pads where handle meets the body.
-  const lugGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16);
+  // --- Handle Attachments ---
+  // Small brackets connecting handle to body.
+  const attachGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.04, 16);
   
-  const topLug = new THREE.Mesh(lugGeom, silverMat);
-  topLug.rotation.z = Math.PI / 2; // Face outward
-  topLug.position.set(0.34, 0.66, 0);
-  root.add(topLug);
+  // Top attachment
+  const attachTop = new THREE.Mesh(attachGeom, silverMat);
+  attachTop.rotation.x = Math.PI / 2; // Horizontal cylinder
+  attachTop.position.set(0, 0.60, 0.22); // On body shoulder
+  root.add(attachTop);
 
-  const botLug = new THREE.Mesh(lugGeom, silverMat);
-  botLug.rotation.z = Math.PI / 2;
-  botLug.position.set(0.34, 0.15, 0);
-  root.add(botLug);
+  // Bottom attachment
+  const attachBottom = new THREE.Mesh(attachGeom, silverMat);
+  attachBottom.rotation.x = Math.PI / 2;
+  attachBottom.position.set(0, 0.20, 0.22); // On body hip
+  root.add(attachBottom);
 
-  // Normalize to fit unit cube
+  // --- Normalization ---
   fitToUnitCube(THREE, root);
   return root;
 }

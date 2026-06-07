@@ -1,50 +1,40 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
-  // Gold material - polished, bright
-  // Using emissive to ensure brightness in dim render environment as per handbook
-  const goldColor = 0xE8C84A;
+  // Gold material - warm rose gold tone.
+  // Metalness capped at 0.6 to prevent black rendering in no-env setup.
+  // Emissive added to lift brightness as per metal handbook.
   const goldMat = new THREE.MeshStandardMaterial({
-    color: goldColor,
+    color: 0xe0ac69,
     metalness: 0.6,
     roughness: 0.25,
-    emissive: goldColor,
-    emissiveIntensity: 0.4,
+    emissive: 0xe0ac69,
+    emissiveIntensity: 0.35,
   });
 
-  // Ring parameters
-  const R_RING = 0.35;       // Radius of the ring centerline
-  const R_BUNDLE = 0.045;    // Radius of the circle the strands orbit (thickness of braid)
-  const R_STRAND = 0.028;    // Radius of individual strand
-  const TWISTS = 3;          // Number of times the braid wraps around the ring
-  const TUBULAR_SEGMENTS = 100; // Smoothness along the ring
-  const RADIAL_SEGMENTS = 12;   // Smoothness of strand cross-section
-  const numStrands = 3;
+  // Ring dimensions
+  const ringRadius = 0.35;      // Distance from center to ring core
+  const braidRadius = 0.045;    // Distance from ring core to strand center
+  const strandThickness = 0.045; // Radius of the tube strand itself
+  const twists = 14;            // Number of full rotations of the braid
+  const strandCount = 3;        // Number of interwoven strands
+  const tubularSegments = 128;  // Smoothness along the ring
+  const radialSegments = 12;    // Smoothness of the strand cross-section
 
-  // Create 3 strands for a standard braid
-  for (let k = 0; k < numStrands; k++) {
+  // Create multiple strands to form the braid
+  for (let i = 0; i < strandCount; i++) {
+    const phase = (i / strandCount) * Math.PI * 2;
     const points = [];
-    const phase = (k / numStrands) * Math.PI * 2;
 
-    for (let i = 0; i <= TUBULAR_SEGMENTS; i++) {
-      const t = (i / TUBULAR_SEGMENTS) * Math.PI * 2;
-      
-      // Angle around the tube cross-section
-      // v_param determines position on the bundle circle
-      const v_param = TWISTS * t + phase;
+    // Generate points for a helical path around the torus core
+    for (let t = 0; t <= 1; t += 1 / tubularSegments) {
+      const angle = t * Math.PI * 2;             // Angle around the main ring
+      const twistAngle = angle * twists + phase; // Angle of rotation around the ring's tube
 
-      // Parametric Torus formula with variable v
-      // x = (R + r * cos(v)) * cos(u)
-      // y = r * sin(v)
-      // z = (R + r * cos(v)) * sin(u)
-      const cosT = Math.cos(t);
-      const sinT = Math.sin(t);
-      const cosV = Math.cos(v_param);
-      const sinV = Math.sin(v_param);
-
-      const x = (R_RING + R_BUNDLE * cosV) * cosT;
-      const y = R_BUNDLE * sinV;
-      const z = (R_RING + R_BUNDLE * cosV) * sinT;
+      // Torus helix parametric equation
+      const x = (ringRadius + braidRadius * Math.cos(twistAngle)) * Math.cos(angle);
+      const y = braidRadius * Math.sin(twistAngle);
+      const z = (ringRadius + braidRadius * Math.cos(twistAngle)) * Math.sin(angle);
 
       points.push(new THREE.Vector3(x, y, z));
     }
@@ -52,9 +42,16 @@ export default function generate(THREE) {
     const curve = new THREE.CatmullRomCurve3(points);
     curve.closed = true;
 
-    const geometry = new THREE.TubeGeometry(curve, TUBULAR_SEGMENTS, R_STRAND, RADIAL_SEGMENTS, true);
-    const mesh = new THREE.Mesh(geometry, goldMat);
-    root.add(mesh);
+    const strandGeom = new THREE.TubeGeometry(
+      curve,
+      tubularSegments,
+      strandThickness,
+      radialSegments,
+      true
+    );
+
+    const strand = new THREE.Mesh(strandGeom, goldMat);
+    root.add(strand);
   }
 
   fitToUnitCube(THREE, root);

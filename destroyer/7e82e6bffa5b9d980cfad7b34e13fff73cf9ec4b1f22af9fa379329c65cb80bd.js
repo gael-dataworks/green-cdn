@@ -2,155 +2,154 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Fur is very matte and soft.
+  // Main fur: warm golden tan, high roughness for soft fabric look
   const furMat = new THREE.MeshStandardMaterial({
-    color: 0xc4a484,
-    metalness: 0.0,
-    roughness: 0.95,
-  });
-
-  // Snout and foot pads are lighter cream, slightly less rough.
-  const snoutMat = new THREE.MeshStandardMaterial({
-    color: 0xf5deb3,
+    color: 0xc49a6c,
     metalness: 0.0,
     roughness: 0.9,
   });
 
-  // Nose is dark and slightly smoother (leather-like).
-  const noseMat = new THREE.MeshStandardMaterial({
-    color: 0x3e2723,
+  // Snout and foot pads: lighter cream color
+  const snoutMat = new THREE.MeshStandardMaterial({
+    color: 0xe8dcc8,
     metalness: 0.0,
-    roughness: 0.6,
+    roughness: 0.8,
   });
 
-  // Eyes are glossy black beads.
+  // Nose: dark chocolate brown, slightly smoother
+  const noseMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3020,
+    metalness: 0.0,
+    roughness: 0.4,
+  });
+
+  // Eyes: shiny black beads
   const eyeMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
-    metalness: 0.5,
-    roughness: 0.2,
+    color: 0x050505,
+    metalness: 0.0,
+    roughness: 0.1,
   });
 
   // --- Dimensions ---
-  // Base scale for the bear before normalization.
-  const bodyRadius = 0.26;
-  const headRadius = 0.23;
-  const limbRadius = 0.11;
-  const earRadius = 0.08;
-  const snoutRadius = 0.09;
-  const padRadius = 0.075;
-  const noseRadius = 0.028;
-  const eyeRadius = 0.018;
+  const bodyRadius = 0.22;
+  const headRadius = 0.18;
+  const snoutRadius = 0.07;
+  const earRadius = 0.06;
+  const limbRadius = 0.065;
+  const limbLength = 0.16;
+  const footPadRadius = 0.07;
 
   // --- Body ---
-  // Squashed sphere for the torso.
+  // Pear-shaped body: sphere scaled Y and slightly Z
   const bodyGeom = new THREE.SphereGeometry(bodyRadius, 32, 32);
   const body = new THREE.Mesh(bodyGeom, furMat);
-  body.scale.set(1.1, 0.9, 1.0);
-  body.position.y = 0.22;
+  body.scale.set(1.0, 1.1, 0.9);
+  body.position.y = -0.05;
   root.add(body);
 
   // --- Head Group ---
   const headGroup = new THREE.Group();
-  headGroup.position.y = 0.48;
+  headGroup.position.y = bodyRadius * 0.8; // Sit on top of body
   root.add(headGroup);
 
   const headGeom = new THREE.SphereGeometry(headRadius, 32, 32);
   const head = new THREE.Mesh(headGeom, furMat);
-  // Slight squash for head
-  head.scale.set(1.05, 0.95, 1.0);
+  // Slightly flatten head vertically for plush look
+  head.scale.set(1.0, 0.9, 0.95);
   headGroup.add(head);
 
-  // --- Snout ---
-  const snoutGeom = new THREE.SphereGeometry(snoutRadius, 32, 32);
-  const snout = new THREE.Mesh(snoutGeom, snoutMat);
-  snout.scale.set(1.3, 0.9, 0.9);
-  snout.position.set(0, -0.02, 0.19);
-  headGroup.add(snout);
-
-  // --- Nose ---
-  const noseGeom = new THREE.SphereGeometry(noseRadius, 16, 16);
-  const nose = new THREE.Mesh(noseGeom, noseMat);
-  nose.position.set(0, 0.02, 0.26);
-  headGroup.add(nose);
-
-  // --- Eyes ---
-  const eyeGeom = new THREE.SphereGeometry(eyeRadius, 16, 16);
-  
-  const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
-  leftEye.position.set(-0.09, 0.05, 0.18);
-  headGroup.add(leftEye);
-
-  const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
-  rightEye.position.set(0.09, 0.05, 0.18);
-  headGroup.add(rightEye);
-
   // --- Ears ---
-  const earGeom = new THREE.SphereGeometry(earRadius, 32, 32);
+  const earGeom = new THREE.SphereGeometry(earRadius, 24, 24);
   
   const leftEar = new THREE.Mesh(earGeom, furMat);
-  leftEar.scale.set(1.0, 0.8, 0.4); // Flattened
-  leftEar.position.set(-0.16, 0.18, -0.12);
-  leftEar.rotation.z = 0.2;
-  leftEar.rotation.x = -0.2;
+  leftEar.position.set(-headRadius * 0.6, headRadius * 0.6, -headRadius * 0.4);
+  leftEar.scale.set(1.0, 0.8, 0.4); // Flattened disc shape
+  leftEar.rotation.z = -Math.PI / 6;
   headGroup.add(leftEar);
 
   const rightEar = new THREE.Mesh(earGeom, furMat);
-  rightEar.scale.set(1.0, 0.8, 0.4); // Flattened
-  rightEar.position.set(0.16, 0.18, -0.12);
-  rightEar.rotation.z = -0.2;
-  rightEar.rotation.x = -0.2;
+  rightEar.position.set(headRadius * 0.6, headRadius * 0.6, -headRadius * 0.4);
+  rightEar.scale.set(1.0, 0.8, 0.4);
+  rightEar.rotation.z = Math.PI / 6;
   headGroup.add(rightEar);
 
+  // --- Snout ---
+  const snoutGeom = new THREE.SphereGeometry(snoutRadius, 24, 24);
+  const snout = new THREE.Mesh(snoutGeom, snoutMat);
+  snout.position.set(0, -headRadius * 0.2, headRadius * 0.85);
+  snout.scale.set(1.1, 0.9, 0.8);
+  headGroup.add(snout);
+
+  // --- Nose ---
+  const noseGeom = new THREE.SphereGeometry(snoutRadius * 0.5, 16, 16);
+  const nose = new THREE.Mesh(noseGeom, noseMat);
+  nose.position.set(0, snoutRadius * 0.4, snoutRadius * 0.9);
+  nose.scale.set(1.2, 0.8, 0.8); // Triangular-ish shape
+  headGroup.add(nose);
+
+  // --- Eyes ---
+  const eyeGeom = new THREE.SphereGeometry(0.025, 16, 16);
+  
+  const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
+  leftEye.position.set(-headRadius * 0.4, headRadius * 0.1, headRadius * 0.75);
+  headGroup.add(leftEye);
+
+  const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
+  rightEye.position.set(headRadius * 0.4, headRadius * 0.1, headRadius * 0.75);
+  headGroup.add(rightEye);
+
   // --- Arms ---
-  const armGeom = new THREE.SphereGeometry(limbRadius, 32, 32);
+  const armGeom = new THREE.CapsuleGeometry(limbRadius, limbLength, 8, 16);
   
   const leftArm = new THREE.Mesh(armGeom, furMat);
-  leftArm.scale.set(0.9, 1.2, 0.9); // Elongated
-  leftArm.position.set(-0.28, 0.25, 0.05);
-  leftArm.rotation.z = 0.3;
-  leftArm.rotation.x = 0.2;
+  leftArm.position.set(-(bodyRadius * 0.6), bodyRadius * 0.4, 0);
+  leftArm.rotation.z = Math.PI / 8;
+  leftArm.rotation.x = -Math.PI / 8;
   root.add(leftArm);
 
   const rightArm = new THREE.Mesh(armGeom, furMat);
-  rightArm.scale.set(0.9, 1.2, 0.9); // Elongated
-  rightArm.position.set(0.28, 0.25, 0.05);
-  rightArm.rotation.z = -0.3;
-  rightArm.rotation.x = 0.2;
+  rightArm.position.set(bodyRadius * 0.6, bodyRadius * 0.4, 0);
+  rightArm.rotation.z = -Math.PI / 8;
+  rightArm.rotation.x = -Math.PI / 8;
   root.add(rightArm);
 
   // --- Legs ---
-  const legGeom = new THREE.SphereGeometry(limbRadius, 32, 32);
+  const legGeom = new THREE.CapsuleGeometry(limbRadius * 1.2, limbLength * 0.9, 8, 16);
   
   const leftLeg = new THREE.Mesh(legGeom, furMat);
-  leftLeg.scale.set(1.0, 1.0, 1.1);
-  leftLeg.position.set(-0.16, 0.05, 0.22);
-  leftLeg.rotation.z = 0.4;
-  leftLeg.rotation.x = 0.5;
+  leftLeg.position.set(-(bodyRadius * 0.5), -bodyRadius * 0.6, bodyRadius * 0.4);
+  leftLeg.rotation.x = Math.PI / 3; // Splayed forward
+  leftLeg.rotation.z = Math.PI / 6;
   root.add(leftLeg);
 
   const rightLeg = new THREE.Mesh(legGeom, furMat);
-  rightLeg.scale.set(1.0, 1.0, 1.1);
-  rightLeg.position.set(0.16, 0.05, 0.22);
-  rightLeg.rotation.z = -0.4;
-  rightLeg.rotation.x = 0.5;
+  rightLeg.position.set(bodyRadius * 0.5, -bodyRadius * 0.6, bodyRadius * 0.4);
+  rightLeg.rotation.x = Math.PI / 3;
+  rightLeg.rotation.z = -Math.PI / 6;
   root.add(rightLeg);
 
   // --- Foot Pads ---
-  const padGeom = new THREE.SphereGeometry(padRadius, 32, 32);
+  const padGeom = new THREE.SphereGeometry(footPadRadius, 24, 24);
   
   const leftPad = new THREE.Mesh(padGeom, snoutMat);
-  leftPad.scale.set(1.0, 0.4, 1.3); // Flat oval
-  leftPad.position.set(-0.16, 0.01, 0.30);
-  leftPad.rotation.z = 0.4;
-  leftPad.rotation.x = 0.5;
+  leftPad.position.copy(leftLeg.position);
+  leftPad.position.y -= limbRadius; // Move to bottom of leg
+  leftPad.position.z += limbLength * 0.4; // Move forward
+  leftPad.scale.set(1.2, 0.4, 1.2); // Flattened oval
   root.add(leftPad);
 
   const rightPad = new THREE.Mesh(padGeom, snoutMat);
-  rightPad.scale.set(1.0, 0.4, 1.3); // Flat oval
-  rightPad.position.set(0.16, 0.01, 0.30);
-  rightPad.rotation.z = -0.4;
-  rightPad.rotation.x = 0.5;
+  rightPad.position.copy(rightLeg.position);
+  rightPad.position.y -= limbRadius;
+  rightPad.position.z += limbLength * 0.4;
+  rightPad.scale.set(1.2, 0.4, 1.2);
   root.add(rightPad);
+
+  // --- Tail (small puff at back) ---
+  const tailGeom = new THREE.SphereGeometry(0.05, 16, 16);
+  const tail = new THREE.Mesh(tailGeom, furMat);
+  tail.position.set(0, -bodyRadius * 0.2, -bodyRadius * 0.85);
+  root.add(tail);
 
   fitToUnitCube(THREE, root);
   return root;

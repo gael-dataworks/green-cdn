@@ -1,204 +1,211 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
+  // --- Constants & Dimensions ---
+  // Normalized dimensions before fitToUnitCube
+  const totalWidth = 1.2;
+  const totalDepth = 0.38;
+  const bodyHeight = 0.08;
+  const backPanelHeight = 0.06;
+  const keyCount = 61; // 5 Octaves
+  const keyWidth = totalWidth / keyCount;
+  const whiteKeyDepth = 0.24;
+  const blackKeyDepth = 0.14;
+  const blackKeyWidth = keyWidth * 0.6;
+
   // --- Materials ---
-  // Body: Matte black plastic
   const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
-    metalness: 0.0,
+    color: 0x111111,
+    metalness: 0.1,
     roughness: 0.6,
   });
 
-  // White Keys: Glossy white plastic
   const whiteKeyMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.3,
-  });
-
-  // Black Keys: Matte black plastic (slightly different roughness than body)
-  const blackKeyMat = new THREE.MeshStandardMaterial({
-    color: 0x050505,
-    metalness: 0.0,
-    roughness: 0.5,
-  });
-
-  // Control Panel Labels: Emissive for text/buttons on dark background
-  const panelMat = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    metalness: 0.0,
-    roughness: 0.5,
-  });
-
-  // --- Dimensions ---
-  const totalLength = 1.2;
-  const totalDepth = 0.38;
-  const bodyHeight = 0.08;
-  const keybedY = bodyHeight * 0.5; // Keys sit on top of the base
-  
-  // Key dimensions
-  const numWhiteKeys = 25; // ~2 octaves + C
-  const whiteKeyWidth = 0.036;
-  const whiteKeyDepth = 0.24;
-  const whiteKeyHeight = 0.025;
-  
-  const blackKeyWidth = 0.022;
-  const blackKeyDepth = 0.15;
-  const blackKeyHeight = 0.035;
-
-  // --- Helpers ---
-  function addBox(w, h, d, mat, x, y, z, rx, ry, rz) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    mesh.position.set(x, y, z);
-    if (rx) mesh.rotation.x = rx;
-    if (ry) mesh.rotation.y = ry;
-    if (rz) mesh.rotation.z = rz;
-    root.add(mesh);
-    return mesh;
-  }
-
-  // --- Main Body Chassis ---
-  // Base slab
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(totalLength, bodyHeight, totalDepth),
-    bodyMat
-  );
-  base.position.y = 0;
-  root.add(base);
-
-  // Back panel / Control housing (slightly taller at the back)
-  const backPanelHeight = 0.04;
-  const backPanel = new THREE.Mesh(
-    new THREE.BoxGeometry(totalLength, backPanelHeight, totalDepth * 0.6),
-    bodyMat
-  );
-  backPanel.position.set(0, bodyHeight / 2 + backPanelHeight / 2, -totalDepth * 0.2);
-  root.add(backPanel);
-
-  // --- Control Panel Texture (Procedural) ---
-  // Create a texture for the right-side control area
-  const texWidth = 256;
-  const texHeight = 128;
-  const data = new Uint8Array(texWidth * texHeight * 4);
-  
-  // Fill background dark gray
-  for (let i = 0; i < texWidth * texHeight * 4; i += 4) {
-    data[i] = 30;     // R
-    data[i + 1] = 30; // G
-    data[i + 2] = 35; // B
-    data[i + 3] = 255;// A
-  }
-
-  // Draw "buttons" (light gray circles/rects) and text lines (white)
-  // Helper to draw a rect on the texture buffer
-  function drawRect(x, y, w, h, r, g, b) {
-    for (let iy = y; iy < y + h; iy++) {
-      for (let ix = x; ix < x + w; ix++) {
-        if (ix >= 0 && ix < texWidth && iy >= 0 && iy < texHeight) {
-          const idx = (iy * texWidth + ix) * 4;
-          data[idx] = r;
-          data[idx + 1] = g;
-          data[idx + 2] = b;
-        }
-      }
-    }
-  }
-
-  // Brand text area (top right)
-  drawRect(180, 10, 60, 15, 200, 200, 200); // "Brand" block
-  drawRect(180, 30, 10, 10, 100, 100, 100); // Small logo
-  
-  // Buttons row
-  for (let i = 0; i < 4; i++) {
-    drawRect(160 + i * 20, 60, 16, 16, 150, 150, 160); // Button body
-    drawRect(164 + i * 20, 64, 8, 8, 255, 255, 255);   // Button highlight
-  }
-  
-  // Slider/Track
-  drawRect(160, 90, 70, 6, 80, 80, 80);
-  drawRect(190, 88, 10, 10, 200, 50, 50); // Knob/Slider head
-
-  const controlTexture = new THREE.DataTexture(data, texWidth, texHeight, THREE.RGBAFormat);
-  controlTexture.colorSpace = THREE.SRGBColorSpace;
-  controlTexture.needsUpdate = true;
-  controlTexture.flipY = true;
-
-  const controlPanelMat = new THREE.MeshStandardMaterial({
-    map: controlTexture,
-    color: 0xffffff,
+    color: 0xeeeeee,
     metalness: 0.0,
     roughness: 0.4,
   });
 
-  // Control Panel Geometry (Right side, raised slightly)
-  const panelWidth = totalLength * 0.25;
-  const panelDepth = totalDepth * 0.5;
-  const panelHeight = 0.01;
-  const controlPanel = new THREE.Mesh(
-    new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth),
-    controlPanelMat
-  );
-  // Position on the right side (positive X), at the back
-  controlPanel.position.set(
-    totalLength / 2 - panelWidth / 2, 
-    bodyHeight + backPanelHeight + panelHeight / 2, 
-    -totalDepth * 0.25
-  );
+  const blackKeyMat = new THREE.MeshStandardMaterial({
+    color: 0x050505,
+    metalness: 0.1,
+    roughness: 0.3,
+  });
+
+  const panelMat = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    metalness: 0.1,
+    roughness: 0.5,
+  });
+
+  const sliderMat = new THREE.MeshStandardMaterial({
+    color: 0x888888,
+    metalness: 0.4,
+    roughness: 0.4,
+  });
+
+  const buttonMat = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    metalness: 0.2,
+    roughness: 0.6,
+  });
+
+  // --- Helper: Procedural Control Panel Texture ---
+  function createPanelTexture() {
+    const width = 512;
+    const height = 256;
+    const data = new Uint8Array(width * height * 4);
+    
+    // Fill background (dark gray)
+    for (let i = 0; i < width * height; i++) {
+      data[i * 4] = 40;
+      data[i * 4 + 1] = 40;
+      data[i * 4 + 2] = 45;
+      data[i * 4 + 3] = 255;
+    }
+
+    // Draw Text/Labels (White rectangles/lines)
+    // Helper to draw a rect
+    function drawRect(x, y, w, h, r, g, b) {
+      for (let iy = y; iy < y + h; iy++) {
+        for (let ix = x; ix < x + w; ix++) {
+          if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+            const idx = (iy * width + ix) * 4;
+            data[idx] = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = 255;
+          }
+        }
+      }
+    }
+
+    // Brand Name "Digital Piano" area (Right side)
+    drawRect(300, 20, 180, 30, 200, 200, 200); // Main label
+    drawRect(300, 60, 180, 10, 150, 150, 150); // Sub label
+    
+    // "GHS" Label (Left side of panel)
+    drawRect(50, 40, 60, 20, 220, 220, 220);
+    
+    // Slider tracks
+    for (let i = 0; i < 6; i++) {
+      const sx = 100 + i * 50;
+      drawRect(sx, 80, 4, 100, 50, 50, 50); // Track
+      drawRect(sx - 2, 100 + (i % 3) * 30, 8, 20, 200, 200, 200); // Slider cap
+    }
+
+    // Button grid
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 4; c++) {
+        drawRect(320 + c * 40, 120 + r * 40, 30, 30, 60, 60, 70);
+      }
+    }
+
+    const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  const panelTexture = createPanelTexture();
+  const panelTexturedMat = new THREE.MeshStandardMaterial({
+    map: panelTexture,
+    color: 0xffffff,
+    metalness: 0.1,
+    roughness: 0.5,
+  });
+
+  // --- Chassis Construction ---
+
+  // Main Base Body
+  const baseGeom = new THREE.BoxGeometry(totalWidth, bodyHeight, totalDepth);
+  const base = new THREE.Mesh(baseGeom, bodyMat);
+  base.position.y = bodyHeight / 2;
+  root.add(base);
+
+  // Back Panel Housing (Raised section)
+  const backPanelWidth = totalWidth;
+  const backPanelDepth = totalDepth * 0.6;
+  const backPanelGeom = new THREE.BoxGeometry(backPanelWidth, backPanelHeight, backPanelDepth);
+  const backPanel = new THREE.Mesh(backPanelGeom, bodyMat);
+  backPanel.position.set(0, bodyHeight + backPanelHeight / 2, -totalDepth * 0.15);
+  root.add(backPanel);
+
+  // Pitch Bend Wheel (Left Side)
+  const wheelGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.03, 16);
+  const wheel = new THREE.Mesh(wheelGeom, bodyMat);
+  wheel.rotation.z = Math.PI / 2;
+  wheel.position.set(-totalWidth / 2 - 0.02, bodyHeight * 0.8, totalDepth * 0.3);
+  root.add(wheel);
+
+  // Control Panel Surface (Top of back panel, right side)
+  const controlPanelGeom = new THREE.PlaneGeometry(backPanelWidth * 0.6, backPanelDepth * 0.8);
+  const controlPanel = new THREE.Mesh(controlPanelGeom, panelTexturedMat);
+  controlPanel.rotation.x = Math.PI / 2;
+  // Position on top of back panel, shifted right
+  controlPanel.position.set(totalWidth * 0.1, bodyHeight + backPanelHeight + 0.001, -totalDepth * 0.15);
   root.add(controlPanel);
 
+  // Physical Sliders (on top of control panel)
+  const sliderGeom = new THREE.BoxGeometry(0.02, 0.04, 0.03);
+  for (let i = 0; i < 5; i++) {
+    const slider = new THREE.Mesh(sliderGeom, sliderMat);
+    // Distribute across the panel area
+    const sx = totalWidth * 0.15 + i * (backPanelWidth * 0.5 / 5);
+    slider.position.set(sx, bodyHeight + backPanelHeight + 0.025, -totalDepth * 0.15);
+    root.add(slider);
+  }
 
-  // --- Keys Generation ---
-  
-  // Pattern for black keys: 0=no, 1=yes (relative to white key index)
-  // Standard pattern repeats every 7 white keys: 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0
-  // Indices with black keys after them: 0(C), 1(D), 3(F), 4(G), 5(A)
-  const hasBlackAfter = [true, true, false, true, true, true, false]; 
+  // --- Keybed Construction ---
 
-  const keybedStartX = -totalLength / 2 + 0.02; // Small margin
-  
   // White Keys
-  for (let i = 0; i < numWhiteKeys; i++) {
-    const x = keybedStartX + i * whiteKeyWidth + whiteKeyWidth / 2;
-    const y = keybedY + whiteKeyHeight / 2;
-    const z = 0.05; // Slightly forward
-    
-    const key = new THREE.Mesh(
-      new THREE.BoxGeometry(whiteKeyWidth - 0.002, whiteKeyHeight, whiteKeyDepth),
-      whiteKeyMat
-    );
-    key.position.set(x, y, z);
+  const whiteKeyGeom = new THREE.BoxGeometry(keyWidth * 0.96, 0.05, whiteKeyDepth);
+  // Use InstancedMesh for performance if many keys, but loop is fine for 61
+  for (let i = 0; i < keyCount; i++) {
+    const key = new THREE.Mesh(whiteKeyGeom, whiteKeyMat);
+    // Calculate X position centered
+    const x = -totalWidth / 2 + (i * keyWidth) + (keyWidth / 2);
+    key.position.set(x, bodyHeight + 0.025, totalDepth * 0.1);
     root.add(key);
+  }
 
-    // Black Keys
-    if (hasBlackAfter[i % 7]) {
-      // Black key sits between this white key and the next
-      const bx = x + whiteKeyWidth / 2;
-      const by = keybedY + blackKeyHeight / 2;
-      const bz = z - (whiteKeyDepth - blackKeyDepth) / 2; // Pushed back slightly
-
-      const bKey = new THREE.Mesh(
-        new THREE.BoxGeometry(blackKeyWidth - 0.002, blackKeyHeight, blackKeyDepth),
-        blackKeyMat
-      );
-      bKey.position.set(bx, by, bz);
-      root.add(bKey);
+  // Black Keys
+  const blackKeyGeom = new THREE.BoxGeometry(blackKeyWidth * 0.9, 0.06, blackKeyDepth);
+  // Pattern: 2 black, gap, 3 black, gap. 
+  // Indices in 7-white-key octave: 0(C), 1(D), 2(E), 3(F), 4(G), 5(A), 6(B)
+  // Black keys after: 0, 1, (skip 2), 3, 4, 5, (skip 6)
+  
+  let octaveIndex = 0;
+  for (let i = 0; i < keyCount; i++) {
+    const noteInOctave = i % 7;
+    const hasBlackKey = (noteInOctave === 0 || noteInOctave === 1 || noteInOctave === 3 || noteInOctave === 4 || noteInOctave === 5);
+    
+    // Don't place a black key after the very last white key if it's a B (end of octave)
+    // Also check bounds
+    if (hasBlackKey && i < keyCount - 1) {
+      const key = new THREE.Mesh(blackKeyGeom, blackKeyMat);
+      
+      // Position: Between white key i and i+1
+      const x = -totalWidth / 2 + (i * keyWidth) + keyWidth; 
+      // Z: Further back than white keys
+      const z = totalDepth * 0.1 - (whiteKeyDepth - blackKeyDepth) * 0.5;
+      
+      key.position.set(x, bodyHeight + 0.06, z);
+      root.add(key);
     }
   }
 
-  // --- Side Caps / Speakers (Optional detail for realism) ---
-  // Small grilles on the far left and right ends of the back panel
-  const speakerGrilleGeom = new THREE.BoxGeometry(0.08, 0.03, 0.01);
-  const speakerGrilleMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.9 });
+  // Side Speakers/Grille Detail (Subtle boxes on sides)
+  const speakerGeom = new THREE.BoxGeometry(0.02, 0.06, 0.15);
+  const speakerL = new THREE.Mesh(speakerGeom, bodyMat);
+  speakerL.position.set(-totalWidth / 2 + 0.05, bodyHeight + 0.05, -totalDepth * 0.3);
+  root.add(speakerL);
   
-  const leftSpeaker = new THREE.Mesh(speakerGrilleGeom, speakerGrilleMat);
-  leftSpeaker.position.set(-totalLength / 2 + 0.1, bodyHeight + backPanelHeight / 2, -totalDepth * 0.2);
-  root.add(leftSpeaker);
+  const speakerR = new THREE.Mesh(speakerGeom, bodyMat);
+  speakerR.position.set(totalWidth / 2 - 0.05, bodyHeight + 0.05, -totalDepth * 0.3);
+  root.add(speakerR);
 
-  const rightSpeaker = new THREE.Mesh(speakerGrilleGeom, speakerGrilleMat);
-  rightSpeaker.position.set(totalLength / 2 - 0.1, bodyHeight + backPanelHeight / 2, -totalDepth * 0.2);
-  root.add(rightSpeaker);
-
-
+  // --- Final Normalization ---
   fitToUnitCube(THREE, root);
   return root;
 }

@@ -2,156 +2,184 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  const matPurple = new THREE.MeshStandardMaterial({ color: 0xD4C4E8, roughness: 0.6, metalness: 0.0 });
-  const matGreen = new THREE.MeshStandardMaterial({ color: 0xC4E8D4, roughness: 0.6, metalness: 0.0 });
-  const matYellow = new THREE.MeshStandardMaterial({ color: 0xF0E8C4, roughness: 0.6, metalness: 0.0 });
-  const matRoof = new THREE.MeshStandardMaterial({ color: 0xE8A4A4, roughness: 0.5, metalness: 0.1 });
-  const matWhite = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.4, metalness: 0.0 });
-  const matGlass = new THREE.MeshStandardMaterial({ color: 0x405060, roughness: 0.1, metalness: 0.5 });
-  const matDoor = new THREE.MeshStandardMaterial({ color: 0xA4D8E8, roughness: 0.5, metalness: 0.0 });
-  const matMetal = new THREE.MeshStandardMaterial({ color: 0xCCCCCC, roughness: 0.3, metalness: 0.5 });
-  const matFoundation = new THREE.MeshStandardMaterial({ color: 0xC4B4A4, roughness: 0.7, metalness: 0.0 });
-  const matStep = new THREE.MeshStandardMaterial({ color: 0xAAAAAA, roughness: 0.6, metalness: 0.0 });
+  const matPurple = new THREE.MeshStandardMaterial({ color: 0xdccfe9, roughness: 0.6, metalness: 0.0 });
+  const matGreen = new THREE.MeshStandardMaterial({ color: 0xccead8, roughness: 0.6, metalness: 0.0 });
+  const matPeach = new THREE.MeshStandardMaterial({ color: 0xf5e0c6, roughness: 0.6, metalness: 0.0 });
+  const matRoof = new THREE.MeshStandardMaterial({ color: 0xd48a8a, roughness: 0.5, metalness: 0.0 });
+  const matTrim = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.0 });
+  const matBase = new THREE.MeshStandardMaterial({ color: 0x8b6f55, roughness: 0.7, metalness: 0.0 });
+  const matGlass = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.1, metalness: 0.1 });
+  const matDoor = new THREE.MeshStandardMaterial({ color: 0xaaddff, roughness: 0.5, metalness: 0.0 });
+  const matStep = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.6, metalness: 0.0 });
+  const matGutter = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.3 });
 
   // --- Dimensions ---
-  const houseW = 1.0;
-  const houseD = 0.7;
-  const wallH = 0.5;
-  const roofH = 0.25;
-  const sectionW = houseW / 3;
-  
+  const houseW = 1.2;
+  const houseD = 0.8;
+  const wallH = 0.6;
+  const roofH = 0.35;
+  const baseH = 0.04;
+  const overhang = 0.08;
+
   // --- Helpers ---
-  function createBox(w, h, d, mat, x, y, z, rx, ry, rz) {
+  function addBox(w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z);
-    if (rx) mesh.rotation.x = rx;
-    if (ry) mesh.rotation.y = ry;
-    if (rz) mesh.rotation.z = rz;
+    mesh.rotation.set(rx, ry, rz);
     root.add(mesh);
     return mesh;
   }
 
-  function createWindow(x, y, z, ry, isSide) {
-    const frameW = 0.12;
-    const frameH = 0.14;
-    const frameD = 0.02;
-    
-    // Frame
-    const frame = createBox(frameW, frameH, frameD, matWhite, x, y, z, 0, ry, 0);
-    
-    // Glass
-    const glass = createBox(frameW * 0.8, frameH * 0.8, 0.01, matGlass, x, y, z + (ry ? 0 : 0.015), 0, ry, 0);
-    
-    // Muntins (Grid)
-    const muntinH = createBox(frameW * 0.8, 0.01, 0.01, matWhite, x, y, z + (ry ? 0 : 0.016), 0, ry, 0);
-    const muntinV = createBox(0.01, frameH * 0.8, 0.01, matWhite, x, y, z + (ry ? 0 : 0.016), 0, ry, 0);
+  function addCylinder(rTop, rBot, h, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 16), mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(rx, ry, rz);
+    root.add(mesh);
+    return mesh;
   }
 
-  // --- Foundation ---
-  createBox(houseW + 0.04, 0.04, houseD + 0.04, matFoundation, 0, -wallH / 2 - 0.02, 0);
+  // --- Base Board ---
+  addBox(houseW + 0.04, baseH, houseD + 0.04, matBase, 0, baseH / 2, 0);
 
   // --- Walls ---
-  // Left Section (Purple)
-  createBox(sectionW, wallH, houseD, matPurple, -houseW / 2 + sectionW / 2, 0, 0);
+  // Left Side (Purple lower, Peach upper gable)
+  // We construct the gable end as a prism using extrude logic or just boxes + triangle
+  // Simplified: Box for lower, Prism for upper.
+  const wallThickness = 0.04;
   
-  // Center Section (Green) - Front face primarily
-  // Making it a full block but green, though visually mostly front matters
-  createBox(sectionW, wallH, houseD, matGreen, 0, 0, 0);
+  // Left Wall Lower (Purple)
+  addBox(wallThickness, wallH, houseD, matPurple, -houseW / 2 + wallThickness / 2, wallH / 2, 0);
   
-  // Right Section (Yellow)
-  createBox(sectionW, wallH, houseD, matYellow, houseW / 2 - sectionW / 2, 0, 0);
+  // Gable End Upper (Peach) - Triangle prism
+  // Using a custom shape for the gable triangle
+  const gableShape = new THREE.Shape();
+  gableShape.moveTo(-houseW / 2, wallH);
+  gableShape.lineTo(houseW / 2, wallH);
+  gableShape.lineTo(0, wallH + roofH);
+  gableShape.lineTo(-houseW / 2, wallH);
+  
+  const gableGeom = new THREE.ExtrudeGeometry(gableShape, { depth: wallThickness, bevelEnabled: false });
+  // The extrude goes along Z. We need it to face X (side wall).
+  // Default extrude is Z. Rotate Y 90 deg to face X.
+  const gableMesh = new THREE.Mesh(gableGeom, matPeach);
+  gableMesh.rotation.y = Math.PI / 2;
+  gableMesh.position.set(-houseW / 2 + wallThickness / 2, wallH + roofH / 2, 0);
+  root.add(gableMesh);
+
+  // Front Walls (Green left, Peach right)
+  const frontSplit = -0.2; // Split point on X
+  // Green Section
+  addBox(frontSplit - (-houseW / 2), wallH, wallThickness, matGreen, 
+    (-houseW / 2 + frontSplit) / 2, wallH / 2, houseD / 2 - wallThickness / 2);
+  // Peach Section
+  addBox(houseW / 2 - frontSplit, wallH, wallThickness, matPeach, 
+    (frontSplit + houseW / 2) / 2, wallH / 2, houseD / 2 - wallThickness / 2);
+
+  // Right Wall (Peach)
+  addBox(wallThickness, wallH, houseD, matPeach, houseW / 2 - wallThickness / 2, wallH / 2, 0);
+
+  // Back Wall (Peach - simple closure)
+  addBox(houseW, wallH, wallThickness, matPeach, 0, wallH / 2, -houseD / 2 + wallThickness / 2);
 
   // --- Roof ---
-  // Gable shape
+  // Main Roof Prism
   const roofShape = new THREE.Shape();
-  roofShape.moveTo(-houseW / 2 - 0.05, 0);
-  roofShape.lineTo(0, roofH);
-  roofShape.lineTo(houseW / 2 + 0.05, 0);
-  roofShape.lineTo(-houseW / 2 - 0.05, 0);
-  
-  const roofGeom = new THREE.ExtrudeGeometry(roofShape, {
-    depth: houseD + 0.1,
-    bevelEnabled: false
-  });
-  // Center the extrusion
-  roofGeom.center();
-  const roof = new THREE.Mesh(roofGeom, matRoof);
-  roof.position.set(0, wallH / 2 + roofH / 2, 0);
-  roof.rotation.y = Math.PI; // Flip to match shape orientation if needed
-  root.add(roof);
+  roofShape.moveTo(-houseW / 2 - overhang, wallH);
+  roofShape.lineTo(houseW / 2 + overhang, wallH);
+  roofShape.lineTo(0, wallH + roofH);
+  roofShape.lineTo(-houseW / 2 - overhang, wallH);
 
-  // Roof Ridges (Corrugation)
+  const roofGeom = new THREE.ExtrudeGeometry(roofShape, { depth: houseD + overhang * 2, bevelEnabled: false });
+  const roofMesh = new THREE.Mesh(roofGeom, matRoof);
+  // Extrude is Z, we want it centered.
+  roofMesh.position.set(0, wallH + roofH / 2, -overhang); 
+  root.add(roofMesh);
+
+  // Roof Corrugation (Ridges)
   const ridgeCount = 12;
-  const ridgeSpacing = (houseD + 0.1) / ridgeCount;
-  const ridgeStart = -(houseD + 0.1) / 2 + ridgeSpacing;
+  const ridgeSpacing = (houseD + overhang * 2) / ridgeCount;
   for (let i = 0; i < ridgeCount; i++) {
-    const zPos = ridgeStart + i * ridgeSpacing;
-    // Place ridges on both slopes
-    // Left slope
-    createBox(0.01, 0.01, houseW * 0.9, matRoof, -houseW * 0.2, wallH / 2 + roofH * 0.5, zPos, 0, 0, -Math.atan(roofH / (houseW/2)));
-    // Right slope
-    createBox(0.01, 0.01, houseW * 0.9, matRoof, houseW * 0.2, wallH / 2 + roofH * 0.5, zPos, 0, 0, Math.atan(roofH / (houseW/2)));
+    const z = -houseD / 2 - overhang + i * ridgeSpacing + ridgeSpacing / 2;
+    // Thin box acting as a ridge
+    addBox(houseW + overhang * 2, 0.005, 0.015, matRoof, 0, wallH + roofH + 0.002, z);
   }
-  
-  // Roof Trim (Fascia)
-  createBox(houseW + 0.1, 0.03, 0.03, matWhite, 0, wallH / 2, 0);
-  createBox(houseW + 0.1, 0.03, 0.03, matWhite, 0, wallH / 2, houseD);
 
-
-  // --- Door (on Green Wall) ---
-  const doorW = 0.14;
-  const doorH = 0.28;
-  const doorY = -wallH / 2 + doorH / 2 + 0.02;
-  const doorZ = houseD / 2 + 0.01;
-  
-  // Door Frame
-  createBox(doorW + 0.02, doorH + 0.02, 0.02, matWhite, 0, doorY, doorZ);
-  // Door Panel
-  createBox(doorW, doorH, 0.01, matDoor, 0, doorY, doorZ + 0.01);
-  // Handle
-  createBox(0.01, 0.04, 0.02, matMetal, doorW / 2 - 0.02, doorY, doorZ + 0.015);
-  // Step
-  createBox(doorW + 0.1, 0.03, 0.1, matStep, 0, -wallH / 2 - 0.015, doorZ + 0.06);
+  // White Fascia/Trim under eaves
+  addBox(houseW + overhang * 2 + 0.02, 0.03, 0.03, matTrim, 0, wallH - 0.015, houseD / 2 + overhang / 2);
+  addBox(houseW + overhang * 2 + 0.02, 0.03, 0.03, matTrim, 0, wallH - 0.015, -houseD / 2 - overhang / 2);
 
   // --- Windows ---
-  // Purple Wall (Left Side)
-  createWindow(-houseW / 2 - 0.01, 0.05, 0, Math.PI / 2);
-  // Yellow Wall (Front Right)
-  createWindow(houseW / 2 - sectionW / 2, 0.05, houseD / 2 + 0.01, 0);
-  // Yellow Wall (Right Side)
-  createWindow(houseW / 2 + 0.01, 0.05, 0, -Math.PI / 2);
-
-  // --- Vent (Back Yellow Gable) ---
-  const ventW = 0.08;
-  const ventH = 0.1;
-  const ventY = wallH / 2 + roofH * 0.4;
-  const ventZ = -houseD / 2 - 0.01;
-  createBox(ventW, ventH, 0.02, matWhite, 0, ventY, ventZ);
-  // Slats
-  for(let i=0; i<4; i++) {
-    createBox(ventW * 0.8, 0.01, 0.01, matGreen, 0, ventY - 0.03 + i * 0.02, ventZ - 0.01);
+  function createWindow(x, y, z, ry) {
+    const wFrame = 0.14;
+    const hFrame = 0.16;
+    const dFrame = 0.02;
+    
+    // Frame
+    addBox(wFrame, hFrame, dFrame, matTrim, x, y, z, 0, ry, 0);
+    
+    // Glass Panes (4 small ones)
+    const paneW = 0.05;
+    const paneH = 0.06;
+    const gap = 0.01;
+    const glassZ = z + (ry === 0 ? 0.01 : 0); // Slight offset based on rotation
+    
+    // Top Left
+    addBox(paneW, paneH, 0.01, matGlass, x - paneW/2 - gap/2, y + paneH/2 + gap/2, z + 0.005, 0, ry, 0);
+    // Top Right
+    addBox(paneW, paneH, 0.01, matGlass, x + paneW/2 + gap/2, y + paneH/2 + gap/2, z + 0.005, 0, ry, 0);
+    // Bottom Left
+    addBox(paneW, paneH, 0.01, matGlass, x - paneW/2 - gap/2, y - paneH/2 - gap/2, z + 0.005, 0, ry, 0);
+    // Bottom Right
+    addBox(paneW, paneH, 0.01, matGlass, x + paneW/2 + gap/2, y - paneH/2 - gap/2, z + 0.005, 0, ry, 0);
   }
 
-  // --- Gutter & Downspout ---
-  // Corner is at x = houseW/2 - sectionW/2 (approx 0.16), z = houseD/2
-  const gutterX = houseW / 2 - sectionW / 2 + 0.02;
-  const gutterZ = houseD / 2 + 0.02;
+  // Window 1 (Left side, Purple wall)
+  createWindow(-houseW / 2 + wallThickness / 2 + 0.01, wallH * 0.6, -0.15, Math.PI / 2);
   
-  // Vertical Downspout
-  createBox(0.02, wallH + 0.1, 0.02, matMetal, gutterX, 0, gutterZ);
-  
-  // Horizontal Eave Pipe
-  // Along the right side roof edge
-  const eavePipe = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.015, 0.015, houseD + 0.1, 8),
-    matMetal
-  );
-  eavePipe.rotation.z = Math.PI / 2;
-  eavePipe.position.set(gutterX, wallH / 2 + 0.05, 0);
-  root.add(eavePipe);
+  // Window 2 (Front, Green wall)
+  createWindow(-0.45, wallH * 0.6, houseD / 2 - wallThickness / 2 - 0.01, 0);
 
-  // Elbow connector
-  createBox(0.02, 0.02, 0.02, matMetal, gutterX, wallH / 2 + 0.05, gutterZ);
+  // Window 3 (Front, Peach wall)
+  createWindow(0.25, wallH * 0.6, houseD / 2 - wallThickness / 2 - 0.01, 0);
+
+  // Window 4 (Right side, Peach wall)
+  createWindow(houseW / 2 - wallThickness / 2 - 0.01, wallH * 0.6, 0.15, -Math.PI / 2);
+
+  // --- Door ---
+  const doorW = 0.12;
+  const doorH = 0.35;
+  const doorD = 0.02;
+  const doorX = 0.05;
+  const doorY = doorH / 2;
+  const doorZ = houseD / 2 - wallThickness / 2 - 0.01;
+  
+  addBox(doorW, doorH, doorD, matDoor, doorX, doorY, doorZ, 0, 0, 0);
+  // Door Knob
+  addCylinder(0.01, 0.01, 0.03, matTrim, doorX + doorW / 2 - 0.02, doorY, doorZ + doorD / 2 + 0.01, 0, 0, 0);
+  
+  // Step
+  addBox(0.18, 0.03, 0.1, matStep, doorX, 0.015, doorZ + 0.06);
+
+  // --- Vent ---
+  // Small white slats on the gable
+  const ventY = wallH + roofH * 0.6;
+  const ventZ = 0;
+  for (let i = 0; i < 4; i++) {
+    addBox(0.06, 0.005, 0.01, matTrim, -houseW / 2 + wallThickness / 2 + 0.01, ventY + i * 0.025, ventZ, 0, Math.PI/2, 0);
+  }
+
+  // --- Gutter / Downspout ---
+  // Corner downspout on the right front corner
+  const cornerX = houseW / 2 - wallThickness / 2;
+  const cornerZ = houseD / 2 - wallThickness / 2;
+  
+  // Vertical pipe
+  addCylinder(0.015, 0.015, wallH + 0.1, matGutter, cornerX + 0.02, wallH / 2, cornerZ + 0.02, 0, 0, 0);
+  // Elbow at top
+  addCylinder(0.015, 0.015, 0.06, matGutter, cornerX + 0.02, wallH + 0.05, cornerZ + 0.02, Math.PI / 2, 0, 0);
+  // Horizontal gutter along front
+  addCylinder(0.015, 0.015, houseW / 2, matGutter, 0, wallH + 0.05, cornerZ + 0.02, 0, 0, Math.PI / 2);
+
 
   fitToUnitCube(THREE, root);
   return root;

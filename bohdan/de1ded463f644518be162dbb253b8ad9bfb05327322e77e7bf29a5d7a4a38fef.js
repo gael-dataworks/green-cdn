@@ -2,14 +2,14 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Brushed stainless steel: light grey, moderate metalness, low-mid roughness
+  // Brushed stainless steel: capped metalness, moderate roughness
   const steelMat = new THREE.MeshStandardMaterial({
-    color: 0xd4d4d4,
+    color: 0xc0c0c0,
     metalness: 0.6,
-    roughness: 0.35,
+    roughness: 0.3,
   });
 
-  // Clear glass: high transmission, low roughness
+  // Clear glass: physical material with transmission
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     metalness: 0.0,
@@ -17,81 +17,125 @@ export default function generate(THREE) {
     transmission: 0.95,
     ior: 1.5,
     transparent: true,
+    opacity: 1.0,
   });
 
-  // --- Bucket Body ---
-  // Main cylindrical container
-  const bucket_body_geom = new THREE.CylinderGeometry(0.24, 0.24, 0.50, 32);
-  const bucket_body = new THREE.Mesh(bucket_body_geom, steelMat);
-  root.add(bucket_body);
+  // --- Dimensions ---
+  const bodyRadius = 0.22;
+  const bodyHeight = 0.38;
+  const rimThickness = 0.015;
+  const rimWidth = 0.04;
+  
+  // --- 1. Main Metal Body ---
+  // Slightly tapered cylinder for the main bucket
+  const bodyGeom = new THREE.CylinderGeometry(
+    bodyRadius, 
+    bodyRadius, 
+    bodyHeight, 
+    32
+  );
+  const metalBody = new THREE.Mesh(bodyGeom, steelMat);
+  metalBody.position.y = bodyHeight / 2;
+  root.add(metalBody);
 
-  // --- Bucket Rim ---
-  // Rolled edge at the top
-  const bucket_rim_geom = new THREE.TorusGeometry(0.245, 0.018, 16, 32);
-  const bucket_rim = new THREE.Mesh(bucket_rim_geom, steelMat);
-  bucket_rim.rotation.x = Math.PI / 2;
-  bucket_rim.position.y = 0.25;
-  root.add(bucket_rim);
+  // --- 2. Base Rim ---
+  // A slightly wider ring at the bottom
+  const baseRimGeom = new THREE.TorusGeometry(bodyRadius + 0.02, 0.025, 16, 32);
+  const baseRim = new THREE.Mesh(baseRimGeom, steelMat);
+  baseRim.rotation.x = Math.PI / 2;
+  baseRim.position.y = rimThickness / 2;
+  root.add(baseRim);
 
-  // --- Bucket Base ---
-  // Rolled edge at the bottom
-  const bucket_base_geom = new THREE.TorusGeometry(0.245, 0.018, 16, 32);
-  const bucket_base = new THREE.Mesh(bucket_base_geom, steelMat);
-  bucket_base.rotation.x = Math.PI / 2;
-  bucket_base.position.y = -0.25;
-  root.add(bucket_base);
+  // --- 3. Top Rim / Collar ---
+  // The ring where the bottle sits
+  const topRimGeom = new THREE.TorusGeometry(bodyRadius, 0.03, 16, 32);
+  const topRim = new THREE.Mesh(topRimGeom, steelMat);
+  topRim.rotation.x = Math.PI / 2;
+  topRim.position.y = bodyHeight - rimThickness / 2;
+  root.add(topRim);
 
-  // --- Spout ---
-  // Tapered cylinder acting as a pour spout on the left side
-  const spout_geom = new THREE.CylinderGeometry(0.035, 0.055, 0.16, 16);
-  const spout = new THREE.Mesh(spout_geom, steelMat);
-  // Position near top left edge
-  spout.position.set(-0.24, 0.21, 0);
-  // Rotate to point up and out (-X direction). 
-  // Default cylinder is Y-up. Rotate Z by 135 degrees (3PI/4) to point Left-Up.
-  spout.rotation.z = Math.PI * 0.75;
+  // Inner top ring to close the hole visually
+  const innerTopRimGeom = new THREE.RingGeometry(bodyRadius - 0.03, bodyRadius, 32);
+  const innerTopRim = new THREE.Mesh(innerTopRimGeom, steelMat);
+  innerTopRim.rotation.x = Math.PI / 2;
+  innerTopRim.position.y = bodyHeight;
+  root.add(innerTopRim);
+
+  // --- 4. Spout ---
+  // Tapered cylinder, rotated to angle up and out
+  const spoutLength = 0.14;
+  const spoutGeom = new THREE.CylinderGeometry(0.025, 0.045, spoutLength, 16);
+  const spout = new THREE.Mesh(spoutGeom, steelMat);
+  // Position at top edge of body
+  spout.position.set(
+    bodyRadius + spoutLength / 2 * Math.cos(Math.PI / 6), 
+    bodyHeight - 0.05, 
+    0
+  );
+  // Rotate to point up and out (approx 30 degrees from horizontal)
+  spout.rotation.z = -Math.PI / 6; 
   root.add(spout);
 
-  // --- Handle ---
-  // Curved handle on the right side. Using TubeGeometry scaled to be flat.
-  const handlePath = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.24, 0.22, 0),   // Start near top rim
-    new THREE.Vector3(0.36, 0.15, 0),   // Curve out
-    new THREE.Vector3(0.36, -0.15, 0),  // Go down
-    new THREE.Vector3(0.24, -0.20, 0)   // Connect near base
+  // Spout base reinforcement (small ring where it meets body)
+  const spoutBaseGeom = new THREE.TorusGeometry(0.045, 0.015, 8, 16);
+  const spoutBase = new THREE.Mesh(spoutBaseGeom, steelMat);
+  spoutBase.rotation.y = Math.PI / 2;
+  spoutBase.position.copy(spout.position);
+  spoutBase.position.x -= spoutLength / 2 * Math.cos(Math.PI / 6);
+  root.add(spoutBase);
+
+  // --- 5. Handle ---
+  // Curved tube handle on the opposite side
+  const handleCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-bodyRadius, bodyHeight * 0.3, 0),
+    new THREE.Vector3(-bodyRadius - 0.12, bodyHeight * 0.3, 0),
+    new THREE.Vector3(-bodyRadius - 0.12, bodyHeight * 0.7, 0),
+    new THREE.Vector3(-bodyRadius, bodyHeight * 0.7, 0),
   ]);
-  const handle_geom = new THREE.TubeGeometry(handlePath, 24, 0.025, 8, false);
-  const handle = new THREE.Mesh(handle_geom, steelMat);
-  // Scale Z to flatten the tube into a bar shape
-  handle.scale.set(1, 1, 0.5);
+  
+  const handleGeom = new THREE.TubeGeometry(handleCurve, 20, 0.025, 8, false);
+  const handle = new THREE.Mesh(handleGeom, steelMat);
   root.add(handle);
 
-  // --- Hinge / Latch Detail ---
-  // Small rectangular detail on the front-right side
-  const hinge_geom = new THREE.BoxGeometry(0.02, 0.05, 0.04);
-  const hinge = new THREE.Mesh(hinge_geom, steelMat);
-  hinge.position.set(0.24, 0.0, 0.18);
+  // Handle attachment points (small pads on the body)
+  const handlePadGeom = new THREE.CylinderGeometry(0.035, 0.035, 0.01, 16);
+  const handlePadTop = new THREE.Mesh(handlePadGeom, steelMat);
+  handlePadTop.rotation.x = Math.PI / 2;
+  handlePadTop.position.set(-bodyRadius, bodyHeight * 0.7, 0);
+  root.add(handlePadTop);
+
+  const handlePadBottom = new THREE.Mesh(handlePadGeom, steelMat);
+  handlePadBottom.rotation.x = Math.PI / 2;
+  handlePadBottom.position.set(-bodyRadius, bodyHeight * 0.3, 0);
+  root.add(handlePadBottom);
+
+  // Small hinge detail on bottom pad
+  const hingeGeom = new THREE.BoxGeometry(0.02, 0.04, 0.015);
+  const hinge = new THREE.Mesh(hingeGeom, steelMat);
+  hinge.position.set(-bodyRadius, bodyHeight * 0.3, 0);
   root.add(hinge);
 
-  // --- Wine Bottle ---
-  // Glass bottle sitting inside the bucket
+  // --- 6. Glass Bottle ---
+  // Lathe profile for the bottle inside
   const bottleProfile = [
-    new THREE.Vector2(0.00, 0.00), // Bottom center
-    new THREE.Vector2(0.14, 0.00), // Bottom edge
-    new THREE.Vector2(0.14, 0.35), // Body up to shoulder
-    new THREE.Vector2(0.12, 0.42), // Shoulder slope
-    new THREE.Vector2(0.06, 0.48), // Neck start
-    new THREE.Vector2(0.06, 0.72), // Neck up
-    new THREE.Vector2(0.07, 0.76), // Lip flare
-    new THREE.Vector2(0.00, 0.78)  // Top center
+    new THREE.Vector2(0.0, 0.0),       // Bottom center
+    new THREE.Vector2(0.18, 0.0),      // Bottom edge
+    new THREE.Vector2(0.18, 0.15),     // Body side
+    new THREE.Vector2(0.14, 0.25),     // Shoulder start
+    new THREE.Vector2(0.04, 0.35),     // Neck start
+    new THREE.Vector2(0.04, 0.55),     // Neck top
+    new THREE.Vector2(0.05, 0.57),     // Lip flare
+    new THREE.Vector2(0.0, 0.57),      // Top center
   ];
-  const bottle_geom = new THREE.LatheGeometry(bottleProfile, 32);
-  const bottle = new THREE.Mesh(bottle_geom, glassMat);
-  // Position bottle so it sits inside the bucket
-  // Bucket bottom is at y = -0.25. Bottle bottom should be slightly above that.
-  bottle.position.y = -0.22;
-  root.add(bottle);
+  
+  const bottleGeom = new THREE.LatheGeometry(bottleProfile, 32);
+  const glassBottle = new THREE.Mesh(bottleGeom, glassMat);
+  // Position bottle so it sits inside the metal body
+  // Body height is 0.38, bottle needs to sit slightly lower or flush
+  glassBottle.position.y = 0.05; 
+  root.add(glassBottle);
 
+  // --- Normalization ---
   fitToUnitCube(THREE, root);
   return root;
 }

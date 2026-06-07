@@ -2,276 +2,166 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Blade: Polished metal. High brightness via emissive to avoid looking black.
+  // Blade: Polished metal (silver), capped metalness per rules.
   const bladeMat = new THREE.MeshStandardMaterial({
     color: 0xd4d4d4,
     metalness: 0.6,
-    roughness: 0.2,
-    emissive: 0xd4d4d4,
-    emissiveIntensity: 0.3,
+    roughness: 0.3,
   });
 
-  // Handle: Green plastic/rubber. Matte.
+  // Handle: Green plastic/rubber, matte.
   const handleMat = new THREE.MeshStandardMaterial({
     color: 0x4caf50,
     metalness: 0.0,
     roughness: 0.6,
   });
 
-  // --- Procedural Logo Texture ---
-  // Draws "LEWIS" text on a transparent background.
-  function createLogoTexture() {
-    const width = 256;
-    const height = 64;
-    const data = new Uint8Array(width * height * 4);
-    
-    // Helper to draw a filled rect
-    function drawRect(x, y, w, h, r, g, b, a) {
-      for (let j = 0; j < h; j++) {
-        for (let i = 0; i < w; i++) {
-          const idx = ((y + j) * width + (x + i)) * 4;
-          data[idx] = r;
-          data[idx + 1] = g;
-          data[idx + 2] = b;
-          data[idx + 3] = a;
-        }
-      }
-    }
-
-    // Helper to draw a character from a 5x7 bitmap
-    // 1 = pixel on, 0 = off
-    const font = {
-      'L': [0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,1,1,1],
-      'E': [0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1],
-      'W': [1,0,0,0,1, 1,0,0,0,1, 1,0,1,0,1, 1,0,1,0,1, 1,0,1,0,1, 1,1,0,1,1, 1,1,0,1,1],
-      'I': [0,0,1,1,1, 0,0,0,1,0, 0,0,0,1,0, 0,0,0,1,0, 0,0,0,1,0, 0,0,0,1,0, 0,0,1,1,1],
-      'S': [0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1, 0,0,0,0,1, 0,0,1,1,1]
-    };
-
-    const text = "LEWIS";
-    const charW = 5;
-    const charH = 7;
-    const spacing = 2;
-    const totalW = text.length * (charW + spacing);
-    const startX = (width - totalW) / 2;
-    const startY = (height - charH) / 2;
-
-    // Clear background (transparent)
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 0;
-    }
-
-    for (let c = 0; c < text.length; c++) {
-      const char = text[c];
-      const bits = font[char];
-      if (!bits) continue;
-      const cx = startX + c * (charW + spacing);
-      for (let y = 0; y < charH; y++) {
-        for (let x = 0; x < charW; x++) {
-          if (bits[y * charW + x]) {
-            drawRect(cx + x, startY + y, 1, 1, 60, 60, 60, 255);
-          }
-        }
-      }
-    }
-
-    const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
+  // --- Procedural Texture for Blade Logo ---
+  // The reference shows "LEWIS" text on the blade. We generate a DataTexture.
+  const texWidth = 256;
+  const texHeight = 128;
+  const data = new Uint8Array(texWidth * texHeight * 4);
+  
+  // Fill with base steel color (light grey)
+  for (let i = 0; i < texWidth * texHeight; i++) {
+    const base = 200; 
+    data[i * 4 + 0] = base;     // R
+    data[i * 4 + 1] = base;     // G
+    data[i * 4 + 2] = base;     // B
+    data[i * 4 + 3] = 255;      // A
   }
 
-  const logoTexture = createLogoTexture();
-  bladeMat.map = logoTexture;
-  // Adjust UVs roughly via texture transform if needed, but Extrude UVs are usually 0-1 on top face.
-  // We want the logo on the top face. Extrude top face UVs map 0,0 to 1,1 across the shape bounds.
-  // We might need to offset/scale to position it near the spine.
-  logoTexture.repeat.set(1, 1);
-  logoTexture.offset.set(0, 0);
+  // Draw a dark rectangular logo block to represent the text area
+  // Position it roughly where text would be (middle of blade, near spine)
+  const logoX = Math.floor(texWidth * 0.3);
+  const logoY = Math.floor(texHeight * 0.3);
+  const logoW = Math.floor(texWidth * 0.3);
+  const logoH = Math.floor(texHeight * 0.25);
 
+  for (let y = 0; y < texHeight; y++) {
+    for (let x = 0; x < texWidth; x++) {
+      // Simple geometric logo representation
+      if (x >= logoX && x <= logoX + logoW && y >= logoY && y <= logoY + logoH) {
+        const idx = (y * texWidth + x) * 4;
+        // Dark grey text simulation
+        data[idx + 0] = 80;
+        data[idx + 1] = 80;
+        data[idx + 2] = 80;
+        // Add some "lines" to simulate text strokes
+        if ((y - logoY) % 4 < 2) {
+           data[idx + 0] = 50;
+           data[idx + 1] = 50;
+           data[idx + 2] = 50;
+        }
+      }
+      // Add some noise/scratch variation for realism
+      if (Math.sin(x * 0.1) * Math.cos(y * 0.1) > 0.8) {
+         const idx = (y * texWidth + x) * 4;
+         data[idx + 0] += 10;
+         data[idx + 1] += 10;
+         data[idx + 2] += 10;
+      }
+    }
+  }
+
+  const bladeTexture = new THREE.DataTexture(data, texWidth, texHeight, THREE.RGBAFormat);
+  bladeTexture.colorSpace = THREE.SRGBColorSpace;
+  bladeTexture.needsUpdate = true;
+  bladeMat.map = bladeTexture;
 
   // --- Blade Geometry ---
-  // Shape in XY plane. Y is length, X is width.
+  // Define the 2D profile of the blade in the XY plane.
+  // We will extrude this along Z to give it thickness, then rotate to lie flat.
   const bladeShape = new THREE.Shape();
-  // Start at heel (back of blade, near handle)
-  // Heel width approx 0.14 total (0.07 half)
-  const heelW = 0.07;
-  const bladeL = 0.50;
+  const bladeLength = 0.5;
+  const bladeHeight = 0.14;
   
-  bladeShape.moveTo(0, -heelW); 
-  // Tang insertion area (goes into handle)
-  bladeShape.lineTo(-0.05, -heelW); 
-  bladeShape.lineTo(-0.05, heelW);
-  bladeShape.lineTo(0, heelW);
-  
-  // Spine (top edge) - slight curve
-  bladeShape.bezierCurveTo(0.15, heelW * 0.8, 0.35, heelW * 0.4, bladeL, 0);
-  
-  // Edge (bottom edge) - curves up to tip
-  bladeShape.bezierCurveTo(0.35, -heelW * 0.6, 0.15, -heelW * 0.9, 0, -heelW);
+  // Start at heel (near handle)
+  bladeShape.moveTo(0, 0); 
+  // Spine (top edge), slightly curved down towards tip
+  bladeShape.quadraticCurveTo(bladeLength * 0.5, 0.01, bladeLength, -0.02);
+  // Tip
+  bladeShape.lineTo(bladeLength, -0.05);
+  // Belly (cutting edge), curved up towards heel
+  bladeShape.quadraticCurveTo(bladeLength * 0.5, -bladeHeight, 0, -bladeHeight * 0.8);
+  // Heel bottom
+  bladeShape.lineTo(0, -0.02);
+  // Close
+  bladeShape.lineTo(0, 0);
 
-  const bladeGeom = new THREE.ExtrudeGeometry(bladeShape, {
-    depth: 0.015,
+  const bladeExtrudeSettings = {
+    steps: 1,
+    depth: 0.004, // Thin blade
     bevelEnabled: true,
-    bevelThickness: 0.004,
-    bevelSize: 0.004,
-    bevelSegments: 3,
-    steps: 1
-  });
+    bevelThickness: 0.002,
+    bevelSize: 0.002,
+    bevelSegments: 2,
+  };
+
+  const bladeGeom = new THREE.ExtrudeGeometry(bladeShape, bladeExtrudeSettings);
+  // Center the geometry roughly
+  bladeGeom.center();
 
   const blade = new THREE.Mesh(bladeGeom, bladeMat);
-  // Rotate to lie flat in XZ plane. 
-  // Extrude Z (thickness) -> World Y.
-  // Extrude Y (length) -> World Z.
+  // Rotate to lie flat in XZ plane (blade face up)
+  // Extrude comes out of XY plane along Z. We want it in XZ plane.
+  // Rotate -90 deg around X.
   blade.rotation.x = -Math.PI / 2;
-  // Position: Tip at +Z, Heel at 0.
-  // Geometry center is roughly at Y=0.25 (half length).
-  // We want Heel at Z=0. So shift geometry by -0.25 in its local Y (which becomes Z).
-  // Actually, let's just position the mesh.
-  // Local Y=0 is heel. Local Y=0.5 is tip.
-  // After rotation: Local Y becomes World Z.
-  // So Heel is at Z=0, Tip is at Z=0.5.
+  // Position so heel is at origin
   blade.position.set(0, 0, 0); 
-  // Wait, the tang part goes to -0.05. So Heel start is -0.05.
-  // Let's adjust position so the handle connection is clean.
-  // Let's say Handle starts at Z=0. Blade tang goes into it.
-  // Blade geometry Y range: -0.05 (tang end) to 0.5 (tip).
-  // Center of geometry Y: ~0.225.
-  // If we place mesh at Z=0.225, Tip is at 0.5, Tang End is at 0.
-  blade.position.z = 0.225;
-  
-  // Texture positioning: The logo is on the top face (+Z in geo, +Y in world).
-  // UVs for Extrude top face map the shape bounding box to 0..1.
-  // Shape X: -0.07 to 0.07. Shape Y: -0.05 to 0.5.
-  // We want logo near the spine (positive X in shape? No, spine is Y axis in shape? No.)
-  // In my shape definition:
-  // Y is length. X is width.
-  // Spine is the curve from (0, 0.07) to (0.5, 0). This is positive X? No.
-  // My shape: moveTo(0, -0.07). Spine is bezier to (0.5, 0).
-  // Wait, (0, -0.07) is negative X? No, moveTo(x, y).
-  // I used moveTo(0, -heelW). So Y is width?
-  // Let's re-verify axes for Extrude.
-  // Shape is in XY. Extrusion is Z.
-  // I want Length along Z (world). Width along X (world).
-  // So Shape Y should be Length. Shape X should be Width.
-  // My Shape:
-  // moveTo(0, -0.07). X=0, Y=-0.07.
-  // lineTo(-0.05, -0.07). X=-0.05, Y=-0.07.
-  // This means X is Depth (Tang), Y is Width.
-  // This is confusing. Let's restart Shape definition to be clear.
-  
-  // Clear Plan:
-  // Shape X = Width (left/right of knife).
-  // Shape Y = Length (heel to tip).
-  // Extrusion Z = Thickness.
-  // Rotation: X -90 deg.
-  // Result: Shape X -> World X. Shape Y -> World Z. Extrusion Z -> World Y.
-  
-  // Redefine Shape:
-  const bladeShape2 = new THREE.Shape();
-  const w = 0.07; // half width
-  const l = 0.50; // length
-  
-  // Start at Heel Bottom (World -X)
-  bladeShape2.moveTo(-w, 0); 
-  // Tang (goes into handle, negative Y in shape)
-  bladeShape2.lineTo(-w * 0.8, -0.05);
-  bladeShape2.lineTo(w * 0.8, -0.05);
-  bladeShape2.lineTo(w, 0);
-  
-  // Spine (World +X side? No, let's say Spine is +X)
-  // Curve from Heel Top (w, 0) to Tip (0, l)
-  bladeShape2.bezierCurveTo(w * 0.8, l * 0.2, w * 0.4, l * 0.6, 0, l);
-  
-  // Edge (World -X side)
-  // Curve from Tip (0, l) to Heel Bottom (-w, 0)
-  bladeShape2.bezierCurveTo(-w * 0.4, l * 0.6, -w * 0.8, l * 0.2, -w, 0);
-  
-  // Update geometry
-  blade.geometry.dispose();
-  blade.geometry = new THREE.ExtrudeGeometry(bladeShape2, {
-    depth: 0.015,
-    bevelEnabled: true,
-    bevelThickness: 0.004,
-    bevelSize: 0.004,
-    bevelSegments: 3,
-    steps: 1
-  });
-  
-  // Positioning:
-  // Shape Y range: -0.05 (tang end) to 0.5 (tip).
-  // Center Y: 0.225.
-  // We want Tang End at Z=0 (inside handle).
-  // So Mesh Z should be 0.225.
-  blade.position.set(0, 0, 0.225);
-  
-  // Logo Texture Offset:
-  // UVs map X (-0.07 to 0.07) -> 0 to 1.
-  // UVs map Y (-0.05 to 0.5) -> 0 to 1.
-  // Logo is "LEWIS". In photo, it's on the upper half of the blade (near spine), closer to handle.
-  // Spine is +X side. Handle is low Y.
-  // So we want UV X > 0.5 (Spine side). UV Y around 0.2 to 0.5 (Handle to Mid).
-  // Current texture is centered.
-  // Let's shift offset.
-  logoTexture.offset.set(0.1, 0.2); // Move right (spine) and up (towards handle/mid)
-  logoTexture.repeat.set(0.6, 0.4); // Shrink it
-
+  root.add(blade);
 
   // --- Handle Geometry ---
-  // Lathe around Y. Profile in XY.
-  // We want Handle along Z. So Rotate X -90.
-  // Profile Y becomes Z. Profile X becomes Radius.
-  const points = [];
-  // Profile starts at Bolster (Z=0 in world -> Y=0 in profile)
-  // Ends at Butt (Z=-0.5 in world -> Y=0.5 in profile)
-  // Note: Lathe rotates around Y=0. We want the handle to be solid.
-  // Points: (x, y)
-  points.push(new THREE.Vector2(0.06, 0)); // Bolster radius
-  points.push(new THREE.Vector2(0.065, 0.1)); // Grip start swell
-  points.push(new THREE.Vector2(0.075, 0.25)); // Max grip
-  points.push(new THREE.Vector2(0.07, 0.4)); // Taper
-  points.push(new THREE.Vector2(0.06, 0.5)); // Butt
-  points.push(new THREE.Vector2(0, 0.5)); // Close top
-  points.push(new THREE.Vector2(0, 0)); // Close bottom
+  // Use LatheGeometry for the ergonomic rounded shape.
+  // Profile in XY plane, will be rotated to align with Z axis.
+  const handlePoints = [];
+  const handleLen = 0.45;
   
-  const handleGeom = new THREE.LatheGeometry(points, 24);
+  // Define profile from butt (bottom Y) to neck (top Y)
+  // Y goes from 0 to handleLen
+  handlePoints.push(new THREE.Vector2(0, 0)); // Center axis bottom
+  handlePoints.push(new THREE.Vector2(0.065, 0)); // Butt radius
+  handlePoints.push(new THREE.Vector2(0.075, 0.1)); // Ergonomic bulge
+  handlePoints.push(new THREE.Vector2(0.07, 0.25)); // Grip
+  handlePoints.push(new THREE.Vector2(0.055, 0.38)); // Taper to neck
+  handlePoints.push(new THREE.Vector2(0.045, handleLen)); // Neck radius
+  handlePoints.push(new THREE.Vector2(0, handleLen)); // Center axis top
+
+  const handleGeom = new THREE.LatheGeometry(handlePoints, 24);
+  
   const handle = new THREE.Mesh(handleGeom, handleMat);
   
-  // Rotate to align with Z axis
+  // The Lathe creates a shape around Y axis. We need it along Z axis.
+  // Rotate -90 deg around X.
   handle.rotation.x = -Math.PI / 2;
-  // Position:
-  // Profile Y range: 0 to 0.5.
-  // Center Y: 0.25.
-  // We want Bolster (Y=0) at Z=0.
-  // Butt (Y=0.5) at Z=-0.5.
-  // Mesh position Z should be -0.25.
-  handle.position.set(0, 0, -0.25);
   
-  // Add a slight ergonomic bend? 
-  // The reference shows the handle dropping slightly relative to the blade spine.
-  // Let's rotate the handle slightly down around X axis (in world, which is local X for the handle mesh).
-  // Actually, let's just keep it straight for simplicity unless it looks wrong. 
-  // The reference shows a slight drop. Let's rotate handle +10 deg around X (local).
-  // Wait, if I rotate handle around X, it points down.
-  handle.rotation.x = -Math.PI / 2 + 0.15; // Tilted down slightly
-  // This will misalign the bolster. Let's just keep it straight for robustness.
-  // Reverting to straight.
-  handle.rotation.x = -Math.PI / 2;
+  // Scale to make it oval (wider than tall) for ergonomic grip
+  handle.scale.set(1.4, 1, 1);
+  
+  // Position: The neck of the handle should meet the heel of the blade.
+  // Blade heel is at (0,0,0). Handle neck is at local Z = handleLen (before rotation/scale).
+  // After rotation -90 X, local Y becomes local Z. So top of lathe (handleLen) is at +Z.
+  // We want the handle to extend to -Z.
+  // So we need to flip it or position it.
+  // Let's position it so the neck is at 0,0,0 and it extends -Z.
+  handle.position.z = handleLen; 
+  
+  // Overlap slightly to cover the tang
+  handle.position.z += 0.02;
 
-
-  // --- Assembly ---
-  root.add(blade);
   root.add(handle);
 
-  // Add a small bolster ring where they meet for visual separation
-  const bolsterGeom = new THREE.CylinderGeometry(0.075, 0.075, 0.02, 24);
-  const bolsterMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.3, roughness: 0.5 });
-  const bolster = new THREE.Mesh(bolsterGeom, bolsterMat);
+  // --- Bolster / Tang Cap ---
+  // Small green piece where handle meets blade to smooth the transition
+  const bolsterGeom = new THREE.CylinderGeometry(0.05, 0.055, 0.03, 16);
+  const bolster = new THREE.Mesh(bolsterGeom, handleMat);
   bolster.rotation.x = Math.PI / 2;
-  bolster.position.set(0, 0, -0.01); // Just inside handle start
+  bolster.position.z = 0.015; // Slightly on the blade side
   root.add(bolster);
 
+  // --- Normalization ---
   fitToUnitCube(THREE, root);
+
   return root;
 }
 

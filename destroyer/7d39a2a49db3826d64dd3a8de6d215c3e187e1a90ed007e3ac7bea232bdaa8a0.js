@@ -2,181 +2,144 @@ export default function generate(THREE) {
   const root = new THREE.Group();
 
   // --- Materials ---
-  // Dark teal/green painted metal
+  // Dark teal/green matte metal
   const metalMat = new THREE.MeshStandardMaterial({
-    color: 0x1f3a3a,
-    metalness: 0.3,
-    roughness: 0.4,
+    color: 0x2f4f4f,
+    metalness: 0.2,
+    roughness: 0.7,
   });
 
-  // Frosted glowing glass
+  // Glowing glass
   const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0xddeeff,
+    color: 0xd0e8ff,
     metalness: 0.0,
-    roughness: 0.3,
-    transmission: 0.85,
+    roughness: 0.1,
+    transmission: 0.6,
+    ior: 1.5,
     transparent: true,
-    opacity: 0.9,
-    emissive: 0xaaccff,
-    emissiveIntensity: 0.6,
-  });
-
-  // Black wire handle
-  const wireMat = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    metalness: 0.1,
-    roughness: 0.5,
+    emissive: 0xaaddff,
+    emissiveIntensity: 2.5,
   });
 
   // --- Dimensions ---
-  const baseH = 0.18;
-  const baseR = 0.22;
-  const globeH = 0.48;
-  const globeR = 0.19;
-  const topH = 0.16;
-  const totalH = baseH + globeH + topH;
+  const baseR = 0.35;
+  const baseH = 0.12;
+  const tankR = 0.30;
+  const tankH = 0.15;
+  const glassH = 0.55;
+  const topCapR = 0.32;
+  const topCapH = 0.14;
+  const totalH = baseH + tankH + glassH + topCapH;
 
-  // --- Base (Fuel Tank) ---
-  const baseGeom = new THREE.CylinderGeometry(baseR * 0.85, baseR, baseH, 32);
+  // --- Base ---
+  const baseGeom = new THREE.CylinderGeometry(baseR, baseR * 1.1, baseH, 32);
   const base = new THREE.Mesh(baseGeom, metalMat);
   base.position.y = baseH / 2;
   root.add(base);
 
-  // Base Rim / Collar
-  const baseRimGeom = new THREE.TorusGeometry(baseR + 0.02, 0.015, 16, 48);
-  const baseRim = new THREE.Mesh(baseRimGeom, metalMat);
-  baseRim.rotation.x = Math.PI / 2;
-  baseRim.position.y = baseH;
-  root.add(baseRim);
+  // --- Fuel Tank ---
+  const tankGeom = new THREE.CylinderGeometry(tankR, tankR, tankH, 32);
+  const tank = new THREE.Mesh(tankGeom, metalMat);
+  tank.position.y = baseH + tankH / 2;
+  root.add(tank);
 
-  // Wick Knob (on front of base)
-  const knobGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.04, 16);
+  // --- Knob / Switch on Tank ---
+  const knobGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.03, 16);
   const knob = new THREE.Mesh(knobGeom, metalMat);
   knob.rotation.x = Math.PI / 2;
-  knob.position.set(0, baseH * 0.6, baseR * 0.85 + 0.02);
+  knob.position.set(0, baseH + tankH / 2, tankR + 0.01);
   root.add(knob);
 
-  // --- Globe (Glass) ---
-  // Lathe profile for bulbous shape
-  const profilePoints = [
-    new THREE.Vector2(0, 0),
-    new THREE.Vector2(0.14, 0.05),
-    new THREE.Vector2(0.19, 0.24),
-    new THREE.Vector2(0.17, 0.43),
-    new THREE.Vector2(0.12, 0.48),
-    new THREE.Vector2(0, 0.48),
+  // --- Glass Chimney (Lathe for bulbous shape) ---
+  // Profile from bottom to top (radius, y) relative to glass center
+  const glassProfile = [
+    new THREE.Vector2(0.0, 0.0),
+    new THREE.Vector2(0.28, 0.0),       // bottom rim
+    new THREE.Vector2(0.32, 0.15),      // belly
+    new THREE.Vector2(0.30, 0.40),      // taper start
+    new THREE.Vector2(0.24, 0.55),      // top rim
+    new THREE.Vector2(0.0, 0.55),       // close top
   ];
-  const globeGeom = new THREE.LatheGeometry(profilePoints, 32);
-  const globe = new THREE.Mesh(globeGeom, glassMat);
-  globe.position.y = baseH + globeH / 2;
-  root.add(globe);
+  const glassGeom = new THREE.LatheGeometry(glassProfile, 32);
+  const glass = new THREE.Mesh(glassGeom, glassMat);
+  glass.position.y = baseH + tankH + glassH / 2;
+  root.add(glass);
 
-  // --- Frame (Wire Cage) ---
-  const frameGroup = new THREE.Group();
+  // --- Top Cap ---
+  const capGeom = new THREE.CylinderGeometry(topCapR, topCapR * 0.9, topCapH, 32);
+  const topCap = new THREE.Mesh(capGeom, metalMat);
+  topCap.position.y = baseH + tankH + glassH + topCapH / 2;
+  root.add(topCap);
+
+  // --- Vent on Top Cap ---
+  const ventGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16);
+  const vent = new THREE.Mesh(ventGeom, metalMat);
+  vent.position.y = baseH + tankH + glassH + topCapH + 0.02;
+  root.add(vent);
+
+  // --- Frame / Guard (4 vertical bars) ---
+  // We use TubeGeometry to curve the bars slightly at top and bottom
+  const frameR = 0.34; // slightly wider than glass
+  const frameTubeR = 0.015;
   
-  // Vertical bars (4 sides)
-  const barHeight = globeH + 0.04; // Connect base rim to top collar
-  const barGeom = new THREE.CylinderGeometry(0.008, 0.008, barHeight, 8);
-  const barPositions = [
-    [globeR + 0.02, baseH - 0.02, 0],
-    [-globeR - 0.02, baseH - 0.02, 0],
-    [0, baseH - 0.02, globeR + 0.02],
-    [0, baseH - 0.02, -globeR - 0.02],
-  ];
-
-  for (const [x, y, z] of barPositions) {
-    const bar = new THREE.Mesh(barGeom, metalMat);
-    bar.position.set(x, y + barHeight / 2, z);
+  function createFrameBar(angle) {
+    const x = Math.cos(angle) * frameR;
+    const z = Math.sin(angle) * frameR;
     
-    // Rotate bars to face center if needed, but cylinders are symmetric radially
-    // However, we need to tilt them slightly to match the globe taper if strict,
-    // but vertical is standard for lanterns.
-    if (x !== 0) bar.rotation.z = Math.PI / 2;
-    if (z !== 0) bar.rotation.x = Math.PI / 2;
+    // Curve points: Base rim -> Up -> Top Cap rim
+    const p1 = new THREE.Vector3(x, baseH * 0.8, z);
+    const p2 = new THREE.Vector3(x, baseH + tankH + glassH * 0.5, z);
+    const p3 = new THREE.Vector3(x * 0.95, baseH + tankH + glassH + topCapH * 0.2, z * 0.95);
     
-    frameGroup.add(bar);
+    const curve = new THREE.CatmullRomCurve3([p1, p2, p3]);
+    const tubeGeom = new THREE.TubeGeometry(curve, 20, frameTubeR, 8, false);
+    const bar = new THREE.Mesh(tubeGeom, metalMat);
+    root.add(bar);
   }
 
-  // Top Frame Ring (holds the vertical bars)
-  const topRingR = globeR + 0.02;
-  const topRingGeom = new THREE.TorusGeometry(topRingR, 0.012, 16, 48);
+  // 4 bars at 0, 90, 180, 270 degrees
+  for (let i = 0; i < 4; i++) {
+    createFrameBar((i / 4) * Math.PI * 2);
+  }
+
+  // --- Horizontal Rings (Top and Bottom of glass area) ---
+  // Bottom ring
+  const bottomRingGeom = new THREE.TorusGeometry(frameR, frameTubeR, 8, 32);
+  const bottomRing = new THREE.Mesh(bottomRingGeom, metalMat);
+  bottomRing.rotation.x = Math.PI / 2;
+  bottomRing.position.y = baseH + tankH + 0.02;
+  root.add(bottomRing);
+
+  // Top ring
+  const topRingGeom = new THREE.TorusGeometry(frameR * 0.95, frameTubeR, 8, 32);
   const topRing = new THREE.Mesh(topRingGeom, metalMat);
   topRing.rotation.x = Math.PI / 2;
-  topRing.position.y = baseH + globeH - 0.02;
-  frameGroup.add(topRing);
-
-  // Bottom Frame Ring (sits on base rim)
-  const botRingGeom = new THREE.TorusGeometry(topRingR, 0.012, 16, 48);
-  const botRing = new THREE.Mesh(botRingGeom, metalMat);
-  botRing.rotation.x = Math.PI / 2;
-  botRing.position.y = baseH - 0.02;
-  frameGroup.add(botRing);
-
-  root.add(frameGroup);
-
-  // --- Top Cap (Chimney/Vent) ---
-  const topGroup = new THREE.Group();
-  
-  // Lower collar (wider)
-  const collarGeom = new THREE.CylinderGeometry(topRingR + 0.01, topRingR + 0.01, 0.04, 32);
-  const collar = new THREE.Mesh(collarGeom, metalMat);
-  collar.position.y = 0.02;
-  topGroup.add(collar);
-
-  // Upper vent (tapered cylinder)
-  const ventGeom = new THREE.CylinderGeometry(0.12, topRingR + 0.01, 0.12, 32);
-  const vent = new THREE.Mesh(ventGeom, metalMat);
-  vent.position.y = 0.04 + 0.12 / 2;
-  topGroup.add(vent);
-
-  // Top Lid (flat disc)
-  const lidGeom = new THREE.CylinderGeometry(0.13, 0.13, 0.015, 32);
-  const lid = new THREE.Mesh(lidGeom, metalMat);
-  lid.position.y = 0.04 + 0.12 + 0.0075;
-  topGroup.add(lid);
-
-  topGroup.position.y = baseH + globeH;
-  root.add(topGroup);
+  topRing.position.y = baseH + tankH + glassH - 0.02;
+  root.add(topRing);
 
   // --- Handle ---
-  // Arching wire
-  const handleRadius = 0.16;
-  const handleTubeR = 0.012;
-  // Torus is in XY plane by default. We want it in YZ plane (facing X) or XZ?
-  // Lantern handle usually goes front-to-back or side-to-side. Image shows side-to-side arch.
-  // So we rotate the torus 90 deg around Y to stand up, then 90 around Z to face front?
-  // Actually, a Torus in XY plane:
-  // Rotate X 90 -> XZ plane (flat on ground).
-  // Rotate Z 90 -> YZ plane (standing up like a wheel).
-  // We want an arch over the top.
-  
-  const handleGeom = new THREE.TorusGeometry(handleRadius, handleTubeR, 16, 32, Math.PI);
-  const handle = new THREE.Mesh(handleGeom, wireMat);
-  // Orient the half-torus to arch over the lantern
-  handle.rotation.x = Math.PI / 2; // Lay flat in XZ
-  handle.rotation.z = Math.PI / 2; // Stand up in YZ
-  // Position at top center
-  handle.position.set(0, baseH + globeH + topH + handleRadius, 0);
-  
-  // Attach handle ends to the frame/base area
-  // The torus center is at the apex. The ends are at y=0 relative to handle mesh.
-  // We need to lower it so ends touch the frame attachment points.
-  // Attachment points are roughly at the top ring level.
-  handle.position.y = (baseH + globeH) + handleRadius; 
-  
+  // Arching wire handle attached to the frame near the top
+  const handleR = 0.15;
+  const handlePath = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-frameR * 0.8, baseH + tankH + glassH + topCapH * 0.5, 0),
+    new THREE.Vector3(0, baseH + tankH + glassH + topCapH + 0.35, 0),
+    new THREE.Vector3(frameR * 0.8, baseH + tankH + glassH + topCapH * 0.5, 0)
+  ]);
+  const handleGeom = new THREE.TubeGeometry(handlePath, 20, 0.012, 8, false);
+  const handle = new THREE.Mesh(handleGeom, metalMat);
   root.add(handle);
 
-  // Handle attachment brackets (small loops on top cap)
-  const bracketGeom = new THREE.TorusGeometry(0.02, 0.006, 8, 16);
-  const bracketL = new THREE.Mesh(bracketGeom, metalMat);
-  bracketL.rotation.y = Math.PI / 2;
-  bracketL.position.set(-handleRadius, baseH + globeH + 0.05, 0);
-  root.add(bracketL);
+  // Handle attachment hooks (small loops on the frame)
+  const hookGeom = new THREE.TorusGeometry(0.025, 0.008, 8, 16);
+  const hookLeft = new THREE.Mesh(hookGeom, metalMat);
+  hookLeft.rotation.y = Math.PI / 2;
+  hookLeft.position.set(-frameR * 0.8, baseH + tankH + glassH + topCapH * 0.5, 0);
+  root.add(hookLeft);
 
-  const bracketR = new THREE.Mesh(bracketGeom, metalMat);
-  bracketR.rotation.y = Math.PI / 2;
-  bracketR.position.set(handleRadius, baseH + globeH + 0.05, 0);
-  root.add(bracketR);
+  const hookRight = new THREE.Mesh(hookGeom, metalMat);
+  hookRight.rotation.y = Math.PI / 2;
+  hookRight.position.set(frameR * 0.8, baseH + tankH + glassH + topCapH * 0.5, 0);
+  root.add(hookRight);
 
   fitToUnitCube(THREE, root);
   return root;

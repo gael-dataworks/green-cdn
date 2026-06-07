@@ -1,98 +1,57 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
-  // --- Texture Generation for Felt + Seam ---
-  // A tennis ball is defined by its fuzzy orange surface and the white curvy seam.
-  // We generate this procedurally to avoid external assets and ensure the pattern
-  // wraps correctly on the sphere.
-  const texWidth = 512;
-  const texHeight = 256;
-  const data = new Uint8Array(texWidth * texHeight * 4);
-
-  // Orange base color (approx #FF6600)
-  const baseR = 255;
-  const baseG = 130;
-  const baseB = 0;
-
-  // Seam color (off-white/light gray)
-  const seamR = 230;
-  const seamG = 230;
-  const seamB = 230;
-
-  for (let y = 0; y < texHeight; y++) {
-    for (let x = 0; x < texWidth; x++) {
-      const i = (y * texWidth + x) * 4;
-
-      // Normalized coordinates
-      const u = x / texWidth;
-      const v = y / texHeight;
-
-      // --- Procedural Noise for Felt Texture ---
-      // Deterministic pseudo-noise using sin/cos to simulate fuzz granularity
-      const noiseScale = 40.0;
-      const noise =
-        (Math.sin(x * noiseScale + y * noiseScale * 0.5) +
-          Math.cos(x * noiseScale * 0.7 - y * noiseScale * 0.3)) *
-        0.5;
-
-      // --- Seam Calculation ---
-      // The seam on a tennis ball approximates a sine wave in equirectangular UV space.
-      // It oscillates around the equator (v = 0.5).
-      const seamFreq = 2.0; // Two bumps per wrap
-      const seamAmp = 0.18; // Amplitude of the wave
-      const seamCenter = 0.5 + seamAmp * Math.sin(u * Math.PI * seamFreq);
-      const seamWidth = 0.025; // Thickness of the white line
-
-      const distToSeam = Math.abs(v - seamCenter);
-
-      let r = baseR;
-      let g = baseG;
-      let b = baseB;
-
-      if (distToSeam < seamWidth) {
-        // Draw the seam
-        // Soften the edges of the seam slightly
-        const alpha = 1.0 - Math.min(1.0, distToSeam / seamWidth);
-        r = seamR * alpha + baseR * (1 - alpha);
-        g = seamG * alpha + baseG * (1 - alpha);
-        b = seamB * alpha + baseB * (1 - alpha);
-      } else {
-        // Apply noise to the orange felt
-        // Darken/lighten slightly based on noise
-        const noiseFactor = 1.0 + noise * 0.15;
-        r = Math.min(255, Math.max(0, baseR * noiseFactor));
-        g = Math.min(255, Math.max(0, baseG * noiseFactor));
-        b = Math.min(255, Math.max(0, baseB * noiseFactor));
-      }
-
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = 255; // Alpha
-    }
-  }
-
-  const texture = new THREE.DataTexture(data, texWidth, texHeight, THREE.RGBAFormat);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.needsUpdate = true;
-
-  // --- Material ---
-  // Felt is very matte (high roughness) and non-metallic.
-  const ballMat = new THREE.MeshStandardMaterial({
-    map: texture,
-    color: 0xffffff, // White base to let texture colors show through accurately
+  // Materials
+  // Felt: High roughness, no metalness, vibrant orange.
+  const feltMat = new THREE.MeshStandardMaterial({
+    color: 0xffaa00,
     metalness: 0.0,
-    roughness: 0.95, // Very rough to simulate fuzzy surface
+    roughness: 0.9,
   });
 
-  // --- Geometry ---
-  // High segment count for a smooth sphere.
-  const ballGeom = new THREE.SphereGeometry(0.5, 64, 64);
-  const ball = new THREE.Mesh(ballGeom, ballMat);
+  // Seam: Off-white, slightly less rough than felt but not shiny plastic.
+  const seamMat = new THREE.MeshStandardMaterial({
+    color: 0xeeeeee,
+    metalness: 0.0,
+    roughness: 0.6,
+  });
 
+  // 1. The Ball Body
+  // Radius 0.5 to fit nicely in unit cube after normalization.
+  const ballGeom = new THREE.SphereGeometry(0.5, 32, 32);
+  const ball = new THREE.Mesh(ballGeom, feltMat);
   root.add(ball);
+
+  // 2. The Seam
+  // The tennis ball seam is a continuous curve wrapping around the sphere.
+  // We approximate it with a wave function around the equator, then rotate.
+  const seamPoints = [];
+  const segments = 64;
+  const radius = 0.51; // Slightly larger than ball radius so seam sits on top
+  const amplitude = 0.22; // Height of the lobes
+
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * Math.PI * 2;
+    // Parametric curve: circle in XZ with Y oscillation
+    const x = Math.cos(t) * radius;
+    const z = Math.sin(t) * radius;
+    // Two lobes per revolution (sin(2t))
+    const y = Math.sin(2 * t) * amplitude;
+    seamPoints.push(new THREE.Vector3(x, y, z));
+  }
+
+  const seamCurve = new THREE.CatmullRomCurve3(seamPoints, true);
+  // TubeGeometry(path, tubularSegments, radius, radialSegments, closed)
+  const seamGeom = new THREE.TubeGeometry(seamCurve, 64, 0.025, 8, true);
+  const seam = new THREE.Mesh(seamGeom, seamMat);
+
+  // Rotate the seam to match the reference orientation
+  // Base curve has lobes at Front-Right (Up) and Front-Left (Down).
+  // Reference has lobes at Top-Left (Up) and Bottom-Right (Down).
+  // Rotation Z by 90 degrees maps Front-Right-Up to Top-Left-Front.
+  seam.rotation.z = Math.PI / 2;
+
+  root.add(seam);
 
   fitToUnitCube(THREE, root);
   return root;

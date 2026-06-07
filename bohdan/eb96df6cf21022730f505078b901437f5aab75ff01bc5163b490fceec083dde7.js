@@ -1,64 +1,57 @@
 export default function generate(THREE) {
   const root = new THREE.Group();
 
-  // Gold material - warm yellow gold. 
-  // Metalness capped at 0.6 per rules to avoid black rendering without env map.
-  // Emissive added to ensure brightness against white background.
+  // Gold material with emissive boost to ensure brightness in the dim renderer
   const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xD4AF37,
+    color: 0xffd700,
     metalness: 0.6,
     roughness: 0.25,
-    emissive: 0xD4AF37,
+    emissive: 0xffd700,
     emissiveIntensity: 0.35,
   });
 
   // Ring dimensions
-  const baseRadius = 0.35;
-  const tubeRadius = 0.038;
-  const waveCount = 16;
-  const waveAmp = 0.045;
-  const tubularSegments = 200;
-  const radialSegments = 14;
+  const ringRadius = 0.35;      // Distance from center to tube center
+  const strandRadius = 0.055;   // Thickness of the braid strands
+  const wraps = 14;             // How many times the strand spirals around the ring
+  const tubeSegments = 256;     // Smoothness along the spiral
+  const radialSegments = 12;    // Smoothness of the tube cross-section
+  const strandCount = 4;        // Number of interwoven strands
 
-  // Helper to create a wavy circular path for the braid strands
-  function createBraidedPath(phaseOffset) {
+  // Helper to create a helical path on a torus
+  // The ring lies in the XY plane (vertical like on a finger), facing +Z
+  function createHelixPath(strandIndex) {
     const points = [];
-    for (let i = 0; i <= tubularSegments; i++) {
-      const t = i / tubularSegments;
-      const angle = t * Math.PI * 2;
-      
-      // Calculate the wave phase for this point
-      const wavePhase = angle * waveCount + phaseOffset;
-      
-      // Oscillate radius and height to create the weave
-      const currentRadius = baseRadius + waveAmp * Math.cos(wavePhase);
-      const y = waveAmp * Math.sin(wavePhase);
-      
-      // Convert polar to cartesian (ring lies in XZ plane)
-      const x = currentRadius * Math.cos(angle);
-      const z = currentRadius * Math.sin(angle);
-      
+    const phaseOffset = (strandIndex / strandCount) * Math.PI * 2;
+    
+    for (let i = 0; i <= tubeSegments; i++) {
+      const t = i / tubeSegments;
+      const u = t * Math.PI * 2;                  // Angle around the main ring
+      const v = t * Math.PI * 2 * wraps + phaseOffset; // Angle around the tube cross-section
+
+      // Torus parametric equation (Vertical Ring in XY plane)
+      const x = (ringRadius + strandRadius * Math.cos(v)) * Math.cos(u);
+      const y = (ringRadius + strandRadius * Math.cos(v)) * Math.sin(u);
+      const z = strandRadius * Math.sin(v);
+
       points.push(new THREE.Vector3(x, y, z));
     }
     return new THREE.CatmullRomCurve3(points);
   }
 
-  // Create two intertwined strands to simulate the braid/foxtail pattern
-  const path1 = createBraidedPath(0);
-  const path2 = createBraidedPath(Math.PI);
-
-  const tubeGeom1 = new THREE.TubeGeometry(path1, tubularSegments, tubeRadius, radialSegments, false);
-  const tubeGeom2 = new THREE.TubeGeometry(path2, tubularSegments, tubeRadius, radialSegments, false);
-
-  const strand1 = new THREE.Mesh(tubeGeom1, goldMat);
-  const strand2 = new THREE.Mesh(tubeGeom2, goldMat);
-
-  // Flatten the tubes slightly to resemble metal links/ribbons rather than round ropes
-  strand1.scale.y = 0.7;
-  strand2.scale.y = 0.7;
-
-  root.add(strand1);
-  root.add(strand2);
+  // Generate the 4 strands
+  for (let i = 0; i < strandCount; i++) {
+    const path = createHelixPath(i);
+    const geometry = new THREE.TubeGeometry(path, tubeSegments, strandRadius, radialSegments, false);
+    
+    const mesh = new THREE.Mesh(geometry, goldMat);
+    
+    // Flatten the strands slightly to mimic the flat links of a Singapore/Byzantine chain
+    // Scale Z (thickness) down relative to X and Y
+    mesh.scale.set(1, 1, 0.6);
+    
+    root.add(mesh);
+  }
 
   fitToUnitCube(THREE, root);
   return root;
